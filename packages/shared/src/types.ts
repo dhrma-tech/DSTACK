@@ -232,6 +232,19 @@ export interface DesignArtifact {
   chosenVariant: string | null;
   htmlFilePath: string | null;
   screens: JsonObject[];
+  tasteProfileApplied?: boolean;
+}
+
+export interface TasteProfileEntry {
+  variantName: string;
+  verdict: "approved" | "rejected";
+  reason: string;
+  timestamp: string;
+}
+
+export interface TasteProfileWeight {
+  variantName: string;
+  weight: number;
 }
 
 export interface DesignVariant {

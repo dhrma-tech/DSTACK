@@ -8,17 +8,18 @@ allowedTools: ["read_file", "write_file"]
 inputs: [{ name: import-retro, type: boolean, required: false, description: Import latest retro }]
 outputSchema:
   type: object
-  required: ["updatedFields", "addedDecisions", "addedDomainTerms", "importedFromRetro", "memoryFilePath", "previousMemoryHash", "newMemoryHash"]
+  required: ["updatedFields", "addedDecisions", "addedDomainTerms", "importedFromRetro", "dstackMdWritten", "memoryFilePath", "previousMemoryHash", "newMemoryHash"]
   properties:
     updatedFields: { type: array }
     addedDecisions: { type: number }
     addedDomainTerms: { type: number }
     importedFromRetro: { type: boolean }
+    dstackMdWritten: { type: boolean }
     memoryFilePath: { type: string }
     previousMemoryHash: { type: string }
     newMemoryHash: { type: string }
 artifactPath: setup-memory
 nextSkill: office-hours
 failureCases: ["memory.json corrupted", "retro missing when importing"]
-acceptanceCriteria: ["Memory hash changes", "No deletes without confirmation"]
+acceptanceCriteria: ["Memory hash changes", "No deletes without confirmation", "DSTACK.md convention file is created when absent"]
 systemPromptFile: prompt.md

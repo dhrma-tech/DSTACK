@@ -5,18 +5,21 @@ model: gemini-2.0-flash-001
 streaming: true
 requiresArtifacts: []
 allowedTools: ["read_file"]
-inputs: [{ name: suite, type: string, required: true, description: Benchmark suite name }]
+inputs:
+  - { name: suite, type: string, required: true, description: Benchmark suite name }
+  - { name: dry-run, type: boolean, required: false, description: Validate benchmark suite without model calls }
 outputSchema:
   type: object
-  required: ["suiteName", "model", "runAt", "results", "summary"]
+  required: ["suiteName", "model", "runAt", "results", "summary", "dryRun"]
   properties:
     suiteName: { type: string }
     model: { type: string }
     runAt: { type: string }
     results: { type: array }
     summary: { type: object }
+    dryRun: { type: boolean }
 artifactPath: benchmark
 nextSkill: benchmark-models
 failureCases: ["Suite YAML not found", "All prompts fail"]
-acceptanceCriteria: ["Secondary scoring call represented", "Latency recorded"]
+acceptanceCriteria: ["Secondary scoring call represented", "Latency recorded", "Dry run validates without model calls"]
 systemPromptFile: prompt.md

@@ -1,28 +1,32 @@
 name: learn
-description: Store a structured learning entry for future skill context.
-triggerPhrases: ["learn this", "remember this", "add learning"]
+description: Manage structured learning entries for future skill context.
+triggerPhrases: ["learn this", "remember this", "add learning", "search learnings", "export learnings"]
 model: gemini-2.0-flash-001
 streaming: true
 requiresArtifacts: []
 allowedTools: []
 inputs:
-  - { name: insight, type: string, required: true, description: Learning text }
-  - { name: topic, type: string, required: true, description: Topic tag }
+  - { name: add, type: string, required: false, description: Learning text to add }
+  - { name: insight, type: string, required: false, description: Learning text to add }
+  - { name: topic, type: string, required: false, description: Topic tag }
   - { name: applies-to, type: string, required: false, description: Comma-separated skills }
+  - { name: search, type: string, required: false, description: Search query }
+  - { name: prune, type: boolean, required: false, description: Prune old learnings }
+  - { name: older-than, type: number, required: false, description: Age in days for pruning }
+  - { name: export, type: boolean, required: false, description: Export learnings to markdown }
 outputSchema:
   type: object
-  required: ["entryId", "topic", "insight", "originalText", "wasRephrased", "appliesTo", "storedAt", "learningStoreSize"]
+  required: ["mode", "entriesAffected", "entryId", "query", "exportPath", "results", "learningStoreSize"]
   properties:
-    entryId: { type: string }
-    topic: { type: string }
-    insight: { type: string }
-    originalText: { type: string }
-    wasRephrased: { type: boolean }
-    appliesTo: { type: array }
-    storedAt: { type: string }
+    mode: { type: string, enum: ["add", "search", "prune", "export", "list"] }
+    entriesAffected: { type: number }
+    entryId: {}
+    query: {}
+    exportPath: {}
+    results: { type: array }
     learningStoreSize: { type: number }
 artifactPath: learn
 nextSkill: null
 failureCases: ["LearningStore write fails"]
-acceptanceCriteria: ["Learning is persisted", "Entry is actionable"]
+acceptanceCriteria: ["Learning is persisted", "Search/prune/export modes work"]
 systemPromptFile: prompt.md

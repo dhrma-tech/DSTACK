@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
+    "skill:check": "tsx scripts/validate-skill-manifests.ts",
     "ds": "tsx --conditions development packages/cli/src/index.ts"
   },
   "devDependencies": {

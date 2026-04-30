@@ -1,6 +1,6 @@
 import { ConfigManager, SkillExecutor } from "@dstack/core";
 import type { ParsedCommand } from "./parser.js";
-import { helpText, resultText, skillsText, versionText } from "./printer.js";
+import { helpText, resultText, skillCheckText, skillsText, versionText } from "./printer.js";
 
 export async function route(command: ParsedCommand): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   if (command.help) return { stdout: helpText(), stderr: "", exitCode: 0 };
@@ -14,6 +14,7 @@ export async function route(command: ParsedCommand): Promise<{ stdout: string; s
   });
   const executor = new SkillExecutor({ config, interactive: true });
   if (command.listSkills) return { stdout: skillsText(await executor.listSkills()), stderr: "", exitCode: 0 };
+  if (command.skillCheck) return { stdout: skillCheckText(await executor.listSkills()), stderr: "", exitCode: 0 };
   if (!command.invocation) return { stdout: helpText(), stderr: "", exitCode: 0 };
   return { stdout: resultText(await executor.run(command.invocation), { provider: config.provider, includeOutput: command.json || command.verbose }), stderr: "", exitCode: 0 };
 }

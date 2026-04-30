@@ -22,6 +22,18 @@ describe("CLI", () => {
     }
   });
 
+  it("prints the skill health dashboard", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const result = await route(await parseArgv(["--skill-check"], workspace.root));
+      expect(result.stdout).toContain("DStack Skill Check");
+      expect(result.stdout).toContain("Total skills: 42");
+      expect(result.stdout).toContain("Manifest validation: 42/42 loaded");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   it("parses explicit fake provider selection", async () => {
     const parsed = await parseArgv(["/office-hours", "--provider", "fake"]);
     expect(parsed.invocation?.flags.provider).toBe("fake");

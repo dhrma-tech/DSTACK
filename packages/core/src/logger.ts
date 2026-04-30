@@ -45,5 +45,13 @@ export class SessionLogger {
 }
 
 export function sanitize(value: string): string {
-  return value.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED_GEMINI_KEY]").replace(/[A-Za-z0-9_-]{40,}/g, "[REDACTED_TOKEN]");
+  return value
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED_GEMINI_KEY]")
+    .replace(/eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+/g, "[REDACTED_JWT]")
+    .replace(/-----BEGIN[\s\S]*?-----END [A-Z ]+-----/g, "[REDACTED_PEM]")
+    .replace(/AKIA[0-9A-Z]{16}/g, "[REDACTED_AWS_KEY]")
+    .replace(/github_pat_[A-Za-z0-9_]+/g, "[REDACTED_GITHUB_TOKEN]")
+    .replace(/ghp_[A-Za-z0-9_]+/g, "[REDACTED_GITHUB_TOKEN]")
+    .replace(/sk-ant-[A-Za-z0-9_-]+/g, "[REDACTED_ANTHROPIC_KEY]")
+    .replace(/[A-Za-z0-9_-]{40,}/g, "[REDACTED_TOKEN]");
 }

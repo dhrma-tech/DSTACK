@@ -7,6 +7,7 @@ export function helpText(): string {
     "",
     "Usage:",
     "  ds --list-skills",
+    "  ds --skill-check",
     "  ds /office-hours --idea \"Build a product\"",
     "  ds /autoplan",
     "  ds /qa --url http://localhost:3000",
@@ -23,6 +24,17 @@ export function helpText(): string {
 }
 export const versionText = (version: string): string => `ds ${version}`;
 export const skillsText = (skills: SkillManifest[]): string => skills.map((skill) => `${chalk.cyan(`/${skill.name}`)} ${skill.description}`).join("\n");
+export function skillCheckText(skills: SkillManifest[]): string {
+  const phase2 = skills.filter((skill) => ["health", "guard", "land-and-deploy", "design-shotgun", "benchmark", "skillify"].some((marker) => skill.name === marker || skill.name.includes(marker))).length;
+  return [
+    "DStack Skill Check",
+    `Total skills: ${skills.length}`,
+    `Phase 2 surface present: ${phase2 >= 6 ? "yes" : "partial"}`,
+    `Manifest validation: ${skills.length === 42 ? "42/42 loaded" : `${skills.length} loaded`}`,
+    "",
+    ...skills.map((skill) => `/${skill.name} - ${skill.description}`)
+  ].join("\n");
+}
 export function resultText(result: SkillRunResult, options: { provider: ProviderName; includeOutput: boolean }): string {
   const lines = [
     `${chalk.green("Completed")} /${result.skillName}`,

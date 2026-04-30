@@ -7,6 +7,7 @@ import { PairAgentController } from "./browser/pair-agent.js";
 import { BrowserSessionManager } from "./browser/session-manager.js";
 import { defaultDeployConfig, DeployManager } from "./deploy/manager.js";
 import { DesignArtifactRenderer } from "./design/renderer.js";
+import { TasteProfileStore } from "./design/taste-profile.js";
 import { CodexIntegration } from "./integrations/codex.js";
 import { CSOEngine } from "./integrations/cso.js";
 import { LearningStore } from "./memory/learning-store.js";
@@ -147,12 +148,34 @@ async function health(context: SkillExecutionContext): Promise<JsonObject> {
 }
 
 async function learn(context: SkillExecutionContext): Promise<JsonObject> {
-  const insight = requiredStr(context, "insight");
-  const topic = requiredStr(context, "topic");
-  const appliesTo = csv(context.invocation.inputs["applies-to"] ?? context.invocation.inputs.appliesTo);
   const store = new LearningStore({ dstackDir: context.config.dstackDir, projectId: context.config.projectRoot });
-  const entry = await store.add({ topic, insight, originalText: insight, wasRephrased: false, appliesTo: appliesTo.length > 0 ? appliesTo : ["autoplan", "review"], source: "manual" });
-  return mark(context, { entryId: entry.id, topic: entry.topic, insight: entry.insight, originalText: entry.originalText, wasRephrased: entry.wasRephrased, appliesTo: entry.appliesTo, storedAt: entry.createdAt, learningStoreSize: (await store.all()).length });
+  const exportRequested = bool(context.invocation.inputs.export);
+  const pruneRequested = bool(context.invocation.inputs.prune);
+  const searchQuery = str(context.invocation.inputs.search, null);
+  const addText = str(context.invocation.inputs.add, null) ?? str(context.invocation.inputs.insight, null);
+  if (exportRequested) {
+    const results = await store.all();
+    const exportPath = path.join(context.config.dstackDir, "memory", "learnings-export.md");
+    await atomicWrite(exportPath, await store.exportMarkdown());
+    return mark(context, { mode: "export", entriesAffected: results.length, entryId: null, query: null, exportPath, results: results as unknown as JsonObject[], learningStoreSize: results.length });
+  }
+  if (pruneRequested) {
+    const days = num(context.invocation.inputs["older-than"], 90);
+    const affected = await store.pruneOlderThanDays(days);
+    return mark(context, { mode: "prune", entriesAffected: affected, entryId: null, query: null, exportPath: null, results: [], learningStoreSize: (await store.all()).length });
+  }
+  if (searchQuery) {
+    const results = await store.search(searchQuery);
+    return mark(context, { mode: "search", entriesAffected: results.length, entryId: null, query: searchQuery, exportPath: null, results: results as unknown as JsonObject[], learningStoreSize: (await store.all()).length });
+  }
+  if (!addText) {
+    const results = await store.all();
+    return mark(context, { mode: "list", entriesAffected: results.length, entryId: null, query: null, exportPath: null, results: results as unknown as JsonObject[], learningStoreSize: results.length });
+  }
+  const topic = str(context.invocation.inputs.topic, "general")!;
+  const appliesTo = csv(context.invocation.inputs["applies-to"] ?? context.invocation.inputs.appliesTo);
+  const entry = await store.add({ topic, insight: addText, originalText: addText, wasRephrased: false, appliesTo: appliesTo.length > 0 ? appliesTo : ["autoplan", "review"], source: "manual" });
+  return mark(context, { mode: "add", entriesAffected: 1, entryId: entry.id, query: null, exportPath: null, results: [entry] as unknown as JsonObject[], topic: entry.topic, insight: entry.insight, originalText: entry.originalText, wasRephrased: entry.wasRephrased, appliesTo: entry.appliesTo, storedAt: entry.createdAt, learningStoreSize: (await store.all()).length });
 }
 
 async function setupMemory(context: SkillExecutionContext): Promise<JsonObject> {
@@ -187,19 +210,22 @@ async function setupMemory(context: SkillExecutionContext): Promise<JsonObject> 
   }
   memory.updatedAt = now;
   await context.memoryStore.write(memory);
-  return mark(context, { updatedFields: importedFromRetro ? ["keyDecisions", "learnings"] : ["keyDecisions", "domainTerms"], addedDecisions: 1, addedDomainTerms: importedFromRetro ? 0 : 1, importedFromRetro, memoryFilePath: context.memoryStore.memoryPath, previousMemoryHash: previousHash, newMemoryHash: shortHash(JSON.stringify(memory), 12) });
+  const dstackMdPath = path.join(context.config.projectRoot, "DSTACK.md");
+  const dstackMdWritten = !(await exists(dstackMdPath));
+  if (dstackMdWritten) await atomicWrite(dstackMdPath, dstackMdContent(memory));
+  return mark(context, { updatedFields: importedFromRetro ? ["keyDecisions", "learnings"] : ["keyDecisions", "domainTerms"], addedDecisions: 1, addedDomainTerms: importedFromRetro ? 0 : 1, importedFromRetro, dstackMdWritten, memoryFilePath: context.memoryStore.memoryPath, previousMemoryHash: previousHash, newMemoryHash: shortHash(JSON.stringify(memory), 12) });
 }
 
 async function freeze(context: SkillExecutionContext): Promise<JsonObject> {
   const manager = new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
-  const state = await manager.freeze(str(context.invocation.inputs.reason, null), str(context.invocation.inputs.until, null));
-  return mark(context, { frozen: true, frozenAt: state.frozenAt ?? nowIso(), reason: state.reason, frozenUntil: state.frozenUntil, unfreezeCommand: "ds /unfreeze" });
+  const state = await manager.freeze(str(context.invocation.inputs.reason, null), str(context.invocation.inputs.until, null), str(context.invocation.inputs.path, null));
+  return mark(context, { frozen: true, frozenAt: state.frozenAt ?? nowIso(), reason: state.reason, frozenUntil: state.frozenUntil, pathScope: state.pathScope, unfreezeCommand: "ds /unfreeze" });
 }
 
 async function unfreeze(context: SkillExecutionContext): Promise<JsonObject> {
   const manager = new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
   const previous = await manager.unfreeze();
-  return mark(context, { frozen: false, unfrozenAt: nowIso(), previousFreezeReason: previous.reason, previousFrozenSince: previous.frozenAt ?? "" });
+  return mark(context, { frozen: false, unfrozenAt: nowIso(), previousFreezeReason: previous.reason, previousFrozenSince: previous.frozenAt ?? "", previousPathScope: previous.pathScope });
 }
 
 async function setupDeploy(context: SkillExecutionContext): Promise<JsonObject> {
@@ -305,9 +331,16 @@ async function devexReview(context: SkillExecutionContext): Promise<JsonObject> 
   return mark(context, { overallScore: total, overallVerdict: total >= 80 ? "PASS" : total >= 50 ? "REVISE" : "FAIL", categories, readmeScore: hasReadme ? 14 : 0, readmeGaps: hasReadme ? [] : ["README.md is missing."], envSetupScore: 12, envSetupGaps: ["Confirm env var validation path.", "Document fake-provider mode."], testRunTime: null, criticalIssues: hasReadme ? [] : ["No README for contributor onboarding."], mustFixBeforeProceeding: [] });
 }
 
-function designShotgun(context: SkillExecutionContext): JsonObject {
+async function designShotgun(context: SkillExecutionContext): Promise<JsonObject> {
   const subject = str(context.invocation.inputs.screen, null) ?? str(context.invocation.inputs.feature, "Primary workflow")!;
-  return mark(context, { subject, variants: [
+  const taste = new TasteProfileStore({ dstackDir: context.config.dstackDir });
+  const preferences = await taste.getTopPreferences();
+  const selectedVariant = str(context.invocation.inputs.selected, null) ?? str(context.invocation.inputs.variant, null);
+  const verdict = str(context.invocation.inputs["taste-verdict"], null);
+  if (selectedVariant && (verdict === "approved" || verdict === "rejected")) {
+    await taste.record({ variantName: selectedVariant, verdict, reason: str(context.invocation.inputs.reason, "Recorded from /design-shotgun invocation.")! });
+  }
+  return mark(context, { subject, tasteProfileApplied: preferences.length > 0, tastePreferences: preferences as unknown as JsonObject[], variants: [
     { name: "Compact Dashboard", layoutParadigm: "Dense dashboard", componentPhilosophy: "High information density", interactionModel: "Inline actions", visualDirection: "Operational and scan-friendly", components: ["status grid", "artifact list", "command rail"], userFlows: ["scan", "act", "verify"], tradeoffs: { advantages: ["Fast scanning", "Low navigation cost"], disadvantages: ["Can feel dense", "Needs careful hierarchy"] }, bestFor: "Power users" },
     { name: "Card Explorer", layoutParadigm: "Card grid", componentPhilosophy: "Progressive disclosure", interactionModel: "Cards with detail views", visualDirection: "Calm and approachable", components: ["stage cards", "artifact cards", "filter tabs"], userFlows: ["browse", "open", "compare"], tradeoffs: { advantages: ["Friendly overview", "Good for mixed artifacts"], disadvantages: ["Less dense", "Can hide detail"] }, bestFor: "New users" },
     { name: "List+Detail Split", layoutParadigm: "Split pane", componentPhilosophy: "Selection plus inspection", interactionModel: "List selection updates detail pane", visualDirection: "Precise and utilitarian", components: ["skill list", "detail panel", "diff pane"], userFlows: ["select", "inspect", "act"], tradeoffs: { advantages: ["Great comparison", "Stable context"], disadvantages: ["More complex layout", "Mobile needs simplification"] }, bestFor: "Review workflows" }
@@ -377,13 +410,17 @@ async function benchmark(context: SkillExecutionContext): Promise<JsonObject> {
   const runner = new BenchmarkRunner({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
   const suiteName = requiredStr(context, "suite");
   const suite = await runner.loadSuite(suiteName).catch(() => defaultSuite(suiteName));
+  if (context.invocation.flags.dryRun || bool(context.invocation.inputs["dry-run"])) {
+    const estimate = await runner.estimate(suite);
+    return mark(context, { suiteName: suite.name, model: suite.model, runAt: nowIso(), results: [], summary: { avgQualityScore: 0, avgLatencyMs: 0, totalTokens: estimate.estimatedTokens, passRate: 0 }, dryRun: true, promptCount: suite.prompts.length, estimatedTokens: estimate.estimatedTokens });
+  }
   const run = await runner.runSuite(suite, new FakeProvider(), null);
-  return mark(context, { suiteName: run.suiteName, model: run.model ?? suite.model, runAt: run.runAt, results: run.results as unknown as JsonObject[], summary: { avgQualityScore: run.summary.avgQualityScore, avgLatencyMs: run.summary.avgLatencyMs, totalTokens: run.summary.totalInputTokens + run.summary.totalOutputTokens, passRate: run.summary.passRate } });
+  return mark(context, { suiteName: run.suiteName, model: run.model ?? suite.model, runAt: run.runAt, results: run.results as unknown as JsonObject[], summary: { avgQualityScore: run.summary.avgQualityScore, avgLatencyMs: run.summary.avgLatencyMs, totalTokens: run.summary.totalInputTokens + run.summary.totalOutputTokens, passRate: run.summary.passRate }, dryRun: false });
 }
 
 async function benchmarkModels(context: SkillExecutionContext): Promise<JsonObject> {
   const models = csv(context.invocation.inputs.models);
-  const modelResults = (models.length > 0 ? models : ["gemini-2.5-pro", "gemini-2.0-flash"]).map((model, index) => ({ model, avgQualityScore: index === 0 ? 84 : 74, avgLatencyMs: index === 0 ? 1600 : 800, totalTokensUsed: 1200, estimatedCostUsd: null, passRate: index === 0 ? 0.84 : 0.74, promptResults: [] }));
+  const modelResults = (models.length > 0 ? models : ["gemini-2.5-pro", "gemini-2.0-flash"]).map((model, index) => ({ model, avgQualityScore: index === 0 ? 84 : 74, avgLatencyMs: index === 0 ? 1600 : 800, totalTokensUsed: 1200, estimatedCostUsd: estimateGeminiCostUsd(model, 600, 600), passRate: index === 0 ? 0.84 : 0.74, promptResults: [], pricingDisclaimer: "Pricing may be outdated. Verify at ai.google.dev." }));
   const resultsForSummary = modelResults.map((item) => ({ promptId: item.model, model: item.model, prompt: "", response: "", qualityScore: item.avgQualityScore, latencyMs: item.avgLatencyMs, inputTokens: 600, outputTokens: 600, criteriaScores: [], error: null }));
   const summary = summarize(resultsForSummary, "Use pro for quality-sensitive review and flash for fast utility skills.");
   return mark(context, { suiteName: requiredStr(context, "suite"), modelsCompared: modelResults.map((item) => item.model), runAt: nowIso(), modelResults, recommendation: { bestQuality: summary.bestQualityModel ?? modelResults[0]!.model, bestLatency: modelResults.at(-1)!.model, bestValue: modelResults.at(-1)!.model, analysis: summary.recommendation } });
@@ -476,4 +513,44 @@ function arrayOfObjects(value: unknown): JsonObject[] {
 
 function isSensitiveUrl(url: string): boolean {
   return /\/(checkout|payment|billing|admin)(\/|$)/i.test(url);
+}
+
+function dstackMdContent(memory: ProjectMemory): string {
+  return [
+    "# DSTACK.md",
+    "",
+    "Project routing hints for DStack skills.",
+    "",
+    "## Project Context",
+    `- Project: ${memory.projectName}`,
+    `- Goals: ${memory.goals.length > 0 ? memory.goals.join("; ") : "Keep the current DStack workflow moving safely."}`,
+    `- Constraints: ${memory.constraints.length > 0 ? memory.constraints.join("; ") : "Prefer fake-provider mode for offline checks."}`,
+    "",
+    "## Skill Routing",
+    "- New product or feature idea: `/office-hours` then `/autoplan`.",
+    "- Plan quality concern: `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/plan-devex-review`.",
+    "- Apply review feedback: `/plan-tune`.",
+    "- Implementation review: `/review` then `/qa`.",
+    "- Release readiness: `/ship` then `/health`.",
+    "- Deployment: `/setup-deploy`, `/canary`, `/land-and-deploy`.",
+    "- Browser analysis or automation: `/browse`, `/landing-report`, `/scrape`, `/pair-agent`.",
+    "- Persistent memory: `/learn`, `/retro`, `/setup-memory --import-retro`.",
+    "",
+    "## Safety",
+    "- Use `/guard` for read-only sessions.",
+    "- Use `/careful` when every tool call should require approval.",
+    "- Use `/freeze` before deploy freeze windows and `/unfreeze` when ready.",
+    ""
+  ].join("\n");
+}
+
+function estimateGeminiCostUsd(model: string, inputTokens: number, outputTokens: number): number | null {
+  const pricing: Record<string, { input: number; output: number }> = {
+    "gemini-2.0-flash-001": { input: 0.10, output: 0.40 },
+    "gemini-2.0-flash": { input: 0.10, output: 0.40 },
+    "gemini-2.5-pro-preview": { input: 1.25, output: 10.00 },
+    "gemini-2.5-pro": { input: 1.25, output: 10.00 }
+  };
+  const match = pricing[model];
+  return match ? (inputTokens / 1_000_000) * match.input + (outputTokens / 1_000_000) * match.output : null;
 }

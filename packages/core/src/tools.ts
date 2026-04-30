@@ -8,6 +8,7 @@ import type { SessionLogger } from "./logger.js";
 import { sanitize } from "./logger.js";
 import { PermissionGate } from "./permissions.js";
 import { atomicWrite, ensureDir, exists, fileSafeTimestamp, git, resolveInsideRoot } from "./utils.js";
+import { scanDomContent } from "./browser/dom-scanner.js";
 
 const execAsync = promisify(exec);
 
@@ -45,7 +46,8 @@ export class ToolExecutor {
     await this.options.logger?.event("info", "tool_permission", { tool: toolCall.name, permission });
     if (permission === "DENY") throw new PermissionError(`Tool call denied: ${toolCall.name}`);
     try {
-      return await this.registry.get(toolCall.name).execute(toolCall.input, { projectRoot: this.options.projectRoot, config: this.options.config, logger: this.options.logger });
+      const result = await this.registry.get(toolCall.name).execute(toolCall.input, { projectRoot: this.options.projectRoot, config: this.options.config, logger: this.options.logger });
+      return await sanitizeToolResult(result, toolCall.name, this.options.logger);
     } catch (error) {
       return { id: toolCall.id, name: toolCall.name, success: false, output: {}, error: error instanceof Error ? error.message : String(error) };
     }
@@ -153,7 +155,7 @@ function browserTools(): ToolHandler[] {
   };
   return [
     tool("browser_open", "Open a URL.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.goto(stringInput(input.url, "url"), { waitUntil: "networkidle" }); return { success: true, title: await p.title() }; }),
-    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (_input, contextArg) => { const p = await open(contextArg); return { url: p.url(), title: await p.title(), text: await p.locator("body").innerText().catch(() => ""), ariaTree: "", timestamp: new Date().toISOString() }; }),
+    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (_input, contextArg) => { const p = await open(contextArg); const scan = scanDomContent(await p.locator("body").innerText().catch(() => "")); return { url: p.url(), title: await p.title(), text: scan.sanitized, ariaTree: "", timestamp: new Date().toISOString(), promptInjectionDetected: scan.detected, promptInjectionFragments: scan.fragments }; }),
     tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath }; }),
     tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true }; }),
     tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.locator(stringInput(input.ref, "ref")).first().fill(stringInput(input.text, "text")); return { success: true }; }),
@@ -164,5 +166,31 @@ function browserTools(): ToolHandler[] {
 
 function stringInput(value: unknown, name: string): string {
   if (typeof value !== "string") throw new ToolError(`Expected string input: ${name}`);
+  return value;
+}
+
+async function sanitizeToolResult(result: ToolResult, toolName: string, logger: SessionLogger | null): Promise<ToolResult> {
+  const output = sanitizeJsonObject(result.output, toolName, logger);
+  return { ...result, output, error: result.error ? sanitize(result.error) : null };
+}
+
+function sanitizeJsonObject(value: JsonObject, toolName: string, logger: SessionLogger | null): JsonObject {
+  return sanitizeJsonValue(value, toolName, logger) as JsonObject;
+}
+
+function sanitizeJsonValue(value: unknown, toolName: string, logger: SessionLogger | null): unknown {
+  if (typeof value === "string") {
+    const sanitizedSecret = sanitize(value);
+    if (!toolName.startsWith("browser_")) return sanitizedSecret;
+    const scan = scanDomContent(sanitizedSecret);
+    if (scan.detected) {
+      void logger?.event("error", "browser_prompt_injection_redacted", { tool: toolName, fragments: scan.fragments });
+    }
+    return scan.sanitized;
+  }
+  if (Array.isArray(value)) return value.map((item) => sanitizeJsonValue(item, toolName, logger));
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeJsonValue(item, toolName, logger)]));
+  }
   return value;
 }

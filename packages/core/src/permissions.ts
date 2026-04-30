@@ -3,7 +3,21 @@ import { stdin as input, stdout as output } from "node:process";
 import { PermissionError, type PermissionDecision, type PermissionLevel, type SafetyMode, type ToolCall } from "@dstack/shared";
 import { normalMode, SafetyModeManager } from "./safety/mode-manager.js";
 
-const destructive = [/\brm\s+-rf\b/i, /\bsudo\b/i, /\bcurl\b.*\|\s*(bash|sh)\b/i, /\bwget\b.*\|\s*(bash|sh)\b/i, /\beval\b/i, /\bdd\s+if=/i, /\bmkfs\b/i, /\bxargs\b/i, /\b(bash|sh)\s+-c\b/i];
+const destructive = [
+  /\brm\s+-rf\b/i,
+  /\bsudo\b/i,
+  /\bDROP\s+(TABLE|DATABASE)\b/i,
+  /\bgit\s+push\s+(--force|-f)\b/i,
+  /\bgit\s+reset\s+--hard\b/i,
+  /\bgit\s+clean\s+-f[dx]?\b/i,
+  /\bcurl\b.*\|\s*(bash|sh)\b/i,
+  /\bwget\b.*\|\s*(bash|sh)\b/i,
+  /\beval\b/i,
+  /\bdd\s+if=/i,
+  /\bmkfs\b/i,
+  /\bxargs\b/i,
+  /\b(bash|sh)\s+-c\b/i
+];
 const approved = [/^npm\s+run\b/i, /^yarn\b/i, /^pnpm\b/i, /^npx\s+(vitest|jest|tsc)\b/i, /^git\s+(status|diff|log)\b/i, /^(ls|dir|cat|type|echo)\b/i, /^node\s+-e\b/i];
 
 export class PermissionGate {
@@ -42,6 +56,7 @@ function decisionFor(toolCall: ToolCall): PermissionDecision {
   if (["write_file", "edit_file", "git_commit", "git_create_branch"].includes(toolCall.name)) return "REQUIRE_APPROVAL";
   if (toolCall.name === "browser_open" && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(String(toolCall.input.url ?? ""))) return "REQUIRE_APPROVAL";
   if (toolCall.name === "read_file" && /(^|[\\/])\.env(\..*)?$/i.test(String(toolCall.input.path ?? ""))) return "DENY";
+  if (toolCall.name === "read_file" && /(^|[\\/])\.dstack[\\/]browser[\\/]sessions[\\/][^\\/]+[\\/]cookies\.json$/i.test(String(toolCall.input.path ?? ""))) return "DENY";
   return "ALLOW";
 }
 

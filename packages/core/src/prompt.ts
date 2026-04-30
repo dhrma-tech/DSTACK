@@ -8,6 +8,7 @@ export interface PromptContext {
   artifacts: Record<string, JsonObject>;
   repoState: JsonObject;
   toolResults: JsonObject[];
+  learnings?: JsonObject[];
 }
 
 export class PromptTemplateEngine {

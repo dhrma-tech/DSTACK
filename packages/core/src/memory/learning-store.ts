@@ -63,9 +63,23 @@ export class LearningStore {
     return entries.length - retained.length;
   }
 
+  async pruneOlderThanDays(days: number): Promise<number> {
+    const cutoff = new Date(Date.now() - Math.max(0, days) * 24 * 60 * 60 * 1000);
+    return this.prune(cutoff);
+  }
+
+  async exportMarkdown(): Promise<string> {
+    const rows = (await this.all()).map((entry) => `| ${escapeCell(entry.topic)} | ${escapeCell(entry.insight)} | ${escapeCell(entry.appliesTo.join(", "))} | ${escapeCell(entry.source)} | ${escapeCell(entry.createdAt)} |`);
+    return ["# DStack Learnings", "", "| Topic | Insight | Applies To | Source | Created At |", "| --- | --- | --- | --- | --- |", ...rows, ""].join("\n");
+  }
+
   private async writeAll(entries: LearningEntry[]): Promise<void> {
     await atomicWrite(this.learningPath, JSON.stringify(entries, null, 2));
   }
+}
+
+function escapeCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 }
 
 function isLearningEntry(value: unknown): value is LearningEntry {

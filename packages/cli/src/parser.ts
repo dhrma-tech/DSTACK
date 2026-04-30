@@ -6,6 +6,7 @@ export interface ParsedCommand {
   help: boolean;
   version: boolean;
   listSkills: boolean;
+  skillCheck: boolean;
   json: boolean;
   verbose: boolean;
   invocation: SkillInvocation | null;
@@ -19,6 +20,7 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("help", { type: "boolean" })
     .option("version", { type: "boolean" })
     .option("list-skills", { type: "boolean" })
+    .option("skill-check", { type: "boolean" })
     .option("force", { type: "boolean", default: false })
     .option("dry-run", { type: "boolean", default: false })
     .option("no-stream", { type: "boolean", default: false })
@@ -29,15 +31,16 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("allow-secrets", { type: "boolean", default: false })
     .parse();
   const skillName = parsed._.map(String)[0] ?? null;
-  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
+  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
   const inputs: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!reserved.has(key) && isJsonValue(value)) inputs[key] = value;
   }
   return {
-    help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed.version !== true),
+    help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed["skill-check"] !== true && parsed.version !== true),
     version: parsed.version === true,
     listSkills: parsed["list-skills"] === true,
+    skillCheck: parsed["skill-check"] === true,
     json: parsed.json === true,
     verbose: parsed.verbose === true,
     invocation: skillName

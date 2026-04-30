@@ -8,12 +8,14 @@ allowedTools: []
 inputs:
   - { name: reason, type: string, required: false, description: Freeze reason }
   - { name: until, type: string, required: false, description: Optional end time }
+  - { name: path, type: string, required: false, description: Optional scoped path }
 outputSchema:
   type: object
   required: ["frozen", "frozenAt", "reason", "frozenUntil", "unfreezeCommand"]
   properties:
     frozen: { type: boolean }
     frozenAt: { type: string }
+    pathScope: {}
     unfreezeCommand: { type: string }
 artifactPath: freeze
 nextSkill: unfreeze

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readdir, rm } from "node:fs/promises";
 import type { JsonObject } from "@dstack/shared";
 import { atomicWrite, ensureDir, exists, readJsonFile } from "../utils.js";
 
@@ -15,6 +16,7 @@ export interface BrowserSessionMetadata {
 
 export class BrowserSessionManager {
   readonly sessionsRoot: string;
+  private readonly navigationFailures = new Map<string, number>();
 
   constructor(private readonly options: BrowserSessionManagerOptions) {
     this.sessionsRoot = path.join(options.dstackDir, "browser", "sessions");
@@ -46,8 +48,36 @@ export class BrowserSessionManager {
     return { name: safeSessionName(name), sessionDir: this.sessionDir(name), cookieCount: (await this.loadCookies(name)).length };
   }
 
+  async list(): Promise<BrowserSessionMetadata[]> {
+    if (!(await exists(this.sessionsRoot))) return [];
+    const entries = await readdir(this.sessionsRoot, { withFileTypes: true });
+    return Promise.all(entries.filter((entry) => entry.isDirectory()).map((entry) => this.metadata(entry.name)));
+  }
+
+  async delete(name: string): Promise<boolean> {
+    const dir = this.sessionDir(name);
+    if (!(await exists(dir))) return false;
+    await rm(dir, { recursive: true, force: true });
+    return true;
+  }
+
+  recordNavigationFailure(url: string): boolean {
+    const origin = originOf(url);
+    const failures = (this.navigationFailures.get(origin) ?? 0) + 1;
+    this.navigationFailures.set(origin, failures);
+    return failures >= 3;
+  }
+
   cookieSetupLaunchOptions(): { headless: false; userDataDir: string } {
     return { headless: false, userDataDir: this.sessionDir("cookie-setup") };
+  }
+}
+
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "unknown";
   }
 }
 

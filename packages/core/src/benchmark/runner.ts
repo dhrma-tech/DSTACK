@@ -67,6 +67,11 @@ export class BenchmarkRunner {
       modelsCompared: []
     };
   }
+
+  async estimate(suite: BenchmarkSuite): Promise<{ promptCount: number; estimatedTokens: number }> {
+    const promptTokens = suite.prompts.reduce((sum, prompt) => sum + Math.ceil(`${prompt.prompt}\n${prompt.scoringRubric}\n${prompt.criteria.join("\n")}`.length / 4), 0);
+    return { promptCount: suite.prompts.length, estimatedTokens: promptTokens * 2 };
+  }
 }
 
 export function summarize(results: BenchmarkPromptResult[], recommendation: string | null): BenchmarkSummary {

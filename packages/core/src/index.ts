@@ -12,6 +12,8 @@ export * from "./browser/pair-agent.js";
 export * from "./browser/session-manager.js";
 export * from "./deploy/manager.js";
 export * from "./design/renderer.js";
+export * from "./design/taste-profile.js";
+export * from "./browser/dom-scanner.js";
 export * from "./integrations/codex.js";
 export * from "./integrations/cso.js";
 export * from "./memory/learning-store.js";

@@ -8,16 +8,20 @@ allowedTools: ["read_file", "search_files"]
 inputs:
   - { name: screen, type: string, required: false, description: Screen name }
   - { name: feature, type: string, required: false, description: Feature description }
+  - { name: selected, type: string, required: false, description: Variant selected for taste profile recording }
+  - { name: taste-verdict, type: string, required: false, description: approved or rejected }
+  - { name: reason, type: string, required: false, description: Taste profile reason }
 outputSchema:
   type: object
-  required: ["subject", "variants", "recommendation", "decisionCriteria"]
+  required: ["subject", "tasteProfileApplied", "variants", "recommendation", "decisionCriteria"]
   properties:
     subject: { type: string }
+    tasteProfileApplied: { type: boolean }
     variants: { type: array }
     recommendation: { type: string }
     decisionCriteria: { type: array }
 artifactPath: design-shotgun
 nextSkill: design-html
 failureCases: ["screen not found", "variants too similar"]
-acceptanceCriteria: ["Exactly three variants", "Recommendation produced"]
+acceptanceCriteria: ["Exactly three variants", "Recommendation produced", "Taste profile is read and can be recorded"]
 systemPromptFile: prompt.md

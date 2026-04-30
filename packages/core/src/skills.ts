@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import { ArtifactError, SkillError, ValidationError, skillManifestSchema, type DStackConfig, type JsonObject, type JsonValue, type Provider, type SkillInvocation, type SkillManifest, type SkillRunResult, type Verdict } from "@dstack/shared";
 import { Logger } from "./logger.js";
 import { ArtifactStore, CheckpointStore, MemoryStore } from "./memory.js";
+import { LearningStore } from "./memory/learning-store.js";
 import { FakeProvider, ModelRouter, StreamHandler } from "./model.js";
 import { PromptTemplateEngine, repoContext } from "./prompt.js";
 import { StalenessDetector } from "./review/staleness.js";
@@ -103,10 +104,11 @@ export class SkillExecutor {
       const toolResults: JsonObject[] = [];
       let rawOutput = "";
       for (let i = 0; i < 8; i += 1) {
+        const builtContext = await handler.buildContext(context);
         const rendered = await new PromptTemplateEngine().render({
           manifest,
           promptFilePath: path.join(this.registry.definitionDirFor(manifest.name), manifest.systemPromptFile),
-          context: { userInputs: { ...invocation.inputs, ...(await handler.buildContext(context)) }, projectMemory: await this.memory.read() as unknown as JsonObject | null, artifacts: prerequisiteArtifacts, repoState: await repoContext(invocation.projectRoot), toolResults },
+          context: { userInputs: { ...invocation.inputs, ...builtContext }, projectMemory: await this.memory.read() as unknown as JsonObject | null, artifacts: prerequisiteArtifacts, repoState: await repoContext(invocation.projectRoot), toolResults, learnings: await relevantLearnings(this.options.config.dstackDir, manifest.name) },
           tools: this.tools.definitions(manifest.allowedTools)
         });
         const response = await new StreamHandler().collect(provider.generate({ model, systemPrompt: rendered.systemPrompt, userMessage: rendered.userMessage, tools: rendered.tools, responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: this.options.config.maxTokens }));
@@ -182,6 +184,11 @@ function validateInputs(manifest: SkillManifest, inputs: Record<string, unknown>
   const missing = manifest.inputs.filter((input) => input.required && inputs[input.name] === undefined).map((input) => input.name);
   if (missing.length > 0) throw new ValidationError(`Missing required inputs for /${manifest.name}: ${missing.join(", ")}`);
 }
+
+async function relevantLearnings(dstackDir: string, skillName: string): Promise<JsonObject[]> {
+  return (await new LearningStore({ dstackDir }).list(skillName)).map((entry) => entry as unknown as JsonObject);
+}
+
 function validateOutputSchema(manifest: SkillManifest, output: JsonObject): void {
   const issues = validateJsonSchema(manifest.outputSchema, output, "$");
   if (issues.length > 0) {
