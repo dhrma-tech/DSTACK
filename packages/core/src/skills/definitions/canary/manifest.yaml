@@ -1,0 +1,28 @@
+name: canary
+description: Run a canary deploy and monitor health checks.
+triggerPhrases: ["canary deploy", "canary", "limited deploy"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: ["setup-deploy", "ship"]
+allowedTools: ["run_command", "read_file"]
+inputs:
+  - { name: env, type: string, required: false, description: Environment }
+  - { name: canary-percent, type: number, required: false, description: Traffic percent }
+  - { name: monitor-duration, type: number, required: false, description: Minutes }
+outputSchema:
+  type: object
+  required: ["environment", "canaryPercent", "deployedAt", "monitorDurationMinutes", "healthChecks", "canaryVerdict", "recommendation", "rollbackExecuted"]
+  properties:
+    environment: { type: string }
+    canaryPercent: { type: number }
+    deployedAt: { type: string }
+    monitorDurationMinutes: { type: number }
+    healthChecks: { type: array }
+    canaryVerdict: { type: string }
+    recommendation: { type: string }
+    rollbackExecuted: { type: boolean }
+artifactPath: canary
+nextSkill: land-and-deploy
+failureCases: ["No canary command", "Freeze active"]
+acceptanceCriteria: ["PROMOTE before production when canary configured"]
+systemPromptFile: prompt.md

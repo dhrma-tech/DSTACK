@@ -1,0 +1,22 @@
+name: freeze
+description: Freeze deploy operations for the project.
+triggerPhrases: ["freeze", "code freeze", "freeze deploys"]
+model: none
+streaming: false
+requiresArtifacts: []
+allowedTools: []
+inputs:
+  - { name: reason, type: string, required: false, description: Freeze reason }
+  - { name: until, type: string, required: false, description: Optional end time }
+outputSchema:
+  type: object
+  required: ["frozen", "frozenAt", "reason", "frozenUntil", "unfreezeCommand"]
+  properties:
+    frozen: { type: boolean }
+    frozenAt: { type: string }
+    unfreezeCommand: { type: string }
+artifactPath: freeze
+nextSkill: unfreeze
+failureCases: ["Already frozen"]
+acceptanceCriteria: ["Freeze persists", "DeployManager reads freeze"]
+systemPromptFile: prompt.md

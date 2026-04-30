@@ -1,0 +1,28 @@
+name: learn
+description: Store a structured learning entry for future skill context.
+triggerPhrases: ["learn this", "remember this", "add learning"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: []
+inputs:
+  - { name: insight, type: string, required: true, description: Learning text }
+  - { name: topic, type: string, required: true, description: Topic tag }
+  - { name: applies-to, type: string, required: false, description: Comma-separated skills }
+outputSchema:
+  type: object
+  required: ["entryId", "topic", "insight", "originalText", "wasRephrased", "appliesTo", "storedAt", "learningStoreSize"]
+  properties:
+    entryId: { type: string }
+    topic: { type: string }
+    insight: { type: string }
+    originalText: { type: string }
+    wasRephrased: { type: boolean }
+    appliesTo: { type: array }
+    storedAt: { type: string }
+    learningStoreSize: { type: number }
+artifactPath: learn
+nextSkill: null
+failureCases: ["LearningStore write fails"]
+acceptanceCriteria: ["Learning is persisted", "Entry is actionable"]
+systemPromptFile: prompt.md

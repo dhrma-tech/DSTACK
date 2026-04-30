@@ -1,0 +1,24 @@
+name: land-and-deploy
+description: Execute configured deploy after ship and QA gates pass.
+triggerPhrases: ["deploy", "land and deploy", "execute deploy"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: ["ship", "setup-deploy"]
+allowedTools: ["read_file", "run_command", "git_status", "git_log"]
+inputs: [{ name: env, type: string, required: false, description: staging or production }]
+outputSchema:
+  type: object
+  required: ["environment", "deployedAt", "deployCommand", "deployOutput", "exitCode", "deployVerdict", "healthCheckUrl", "healthCheckVerdict", "healthCheckAttempts", "rollbackRequired", "rollbackExecuted", "rollbackOutput", "gitHead", "gitBranch", "blockers"]
+  properties:
+    environment: { type: string }
+    deployedAt: { type: string }
+    deployCommand: { type: string }
+    deployOutput: { type: string }
+    exitCode: { type: number }
+    deployVerdict: { type: string, enum: ["PASS", "FAIL"] }
+    blockers: { type: array }
+artifactPath: land-and-deploy
+nextSkill: context-save
+failureCases: ["Freeze active", "Ship failed", "QA failed"]
+acceptanceCriteria: ["Production requires approval", "Preconditions logged"]
+systemPromptFile: prompt.md

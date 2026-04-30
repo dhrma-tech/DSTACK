@@ -1,0 +1,22 @@
+name: careful
+description: Activate CAREFUL safety mode requiring approval for every tool call.
+triggerPhrases: ["careful mode", "approve everything"]
+model: none
+streaming: false
+requiresArtifacts: []
+allowedTools: ["read_file"]
+inputs: [{ name: reason, type: string, required: false, description: Optional reason }]
+outputSchema:
+  type: object
+  required: ["previousMode", "newMode", "activatedAt", "gatedOperations", "deactivationCommand"]
+  properties:
+    previousMode: { type: string }
+    newMode: { type: string, enum: ["CAREFUL"] }
+    activatedAt: { type: string }
+    gatedOperations: { type: array }
+    deactivationCommand: { type: string }
+artifactPath: careful
+nextSkill: null
+failureCases: ["Safety mode file write fails"]
+acceptanceCriteria: ["Mode persists", "Pre-approved commands require approval"]
+systemPromptFile: prompt.md

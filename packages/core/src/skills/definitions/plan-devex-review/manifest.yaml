@@ -1,0 +1,27 @@
+name: plan-devex-review
+description: Review an autoplan artifact for developer experience quality.
+triggerPhrases: ["devex review of plan", "developer experience review"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["autoplan", "plan-eng-review"]
+allowedTools: ["read_file", "list_files", "search_files"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["overallVerdict", "missingDevexTasks", "setupComplexityScore", "onboardingGaps", "toolingIssues", "testInfraGaps", "ciCdGaps", "documentationGaps", "phaseReviews", "mustFixBeforeProceeding"]
+  properties:
+    overallVerdict: { type: string, enum: ["PASS", "REVISE", "FAIL"] }
+    missingDevexTasks: { type: array }
+    setupComplexityScore: { type: number }
+    onboardingGaps: { type: array }
+    toolingIssues: { type: array }
+    testInfraGaps: { type: array }
+    ciCdGaps: { type: array }
+    documentationGaps: { type: array }
+    phaseReviews: { type: array }
+    mustFixBeforeProceeding: { type: array }
+artifactPath: plan-devex-review
+nextSkill: design-consultation
+failureCases: ["autoplan missing"]
+acceptanceCriteria: ["Six categories assessed", "Complexity rationale present"]
+systemPromptFile: prompt.md

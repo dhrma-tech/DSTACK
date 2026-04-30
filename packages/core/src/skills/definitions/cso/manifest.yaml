@@ -1,0 +1,26 @@
+name: cso
+description: Produce a Chief Strategy Officer assessment from the artifact chain.
+triggerPhrases: ["cso review", "strategic review", "big picture review"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["office-hours", "autoplan"]
+allowedTools: ["read_file", "list_files"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["overallAssessment", "confidenceLevel", "strategicStrengths", "topThreeRisks", "scopeAssessment", "timelineRealism", "nextCycleRecommendations", "artifactsReviewed", "summary"]
+  properties:
+    overallAssessment: { type: string }
+    confidenceLevel: { type: string }
+    strategicStrengths: { type: array }
+    topThreeRisks: { type: array }
+    scopeAssessment: { type: string }
+    timelineRealism: { type: string }
+    nextCycleRecommendations: { type: array }
+    artifactsReviewed: { type: array }
+    summary: { type: string }
+artifactPath: cso
+nextSkill: plan-tune
+failureCases: ["Minimal artifact context"]
+acceptanceCriteria: ["Exactly three risks", "Confidence rationale present"]
+systemPromptFile: prompt.md

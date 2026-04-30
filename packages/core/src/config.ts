@@ -9,6 +9,7 @@ export function defaultConfig(projectRoot: string): DStackConfig {
     projectRoot,
     dstackDir: path.join(projectRoot, ".dstack"),
     geminiApiKey: null,
+    provider: "gemini",
     defaultModel: "gemini-2.0-flash-001",
     proModel: "gemini-2.5-pro-preview",
     maxTokens: 8192,
@@ -30,7 +31,7 @@ export function defaultConfig(projectRoot: string): DStackConfig {
 type ConfigFile = Partial<Omit<DStackConfig, "projectRoot" | "dstackDir">>;
 
 export class ConfigManager {
-  static async load(options: { projectRoot: string; cliModel?: string | null; allowSecrets?: boolean }): Promise<DStackConfig> {
+  static async load(options: { projectRoot: string; cliModel?: string | null; cliProvider?: DStackConfig["provider"] | null; allowSecrets?: boolean }): Promise<DStackConfig> {
     const projectRoot = path.resolve(options.projectRoot);
     const base = defaultConfig(projectRoot);
     const configPath = path.join(base.dstackDir, "config.yaml");
@@ -39,6 +40,7 @@ export class ConfigManager {
       ...base,
       ...fileConfig,
       geminiApiKey: process.env.GEMINI_API_KEY ?? fileConfig.geminiApiKey ?? null,
+      provider: options.cliProvider ?? readProviderEnv() ?? fileConfig.provider ?? base.provider,
       defaultModel: options.cliModel ?? process.env.DSTACK_DEFAULT_MODEL ?? fileConfig.defaultModel ?? base.defaultModel,
       proModel: process.env.DSTACK_PRO_MODEL ?? fileConfig.proModel ?? base.proModel,
       maxTokens: readInt("DSTACK_MAX_TOKENS") ?? fileConfig.maxTokens ?? base.maxTokens,
@@ -51,6 +53,13 @@ export class ConfigManager {
     if (!parsed.success) throw new ConfigError("Invalid DStack configuration", { issues: parsed.error.issues });
     return Object.freeze(parsed.data) as DStackConfig;
   }
+}
+
+function readProviderEnv(): DStackConfig["provider"] | undefined {
+  const value = process.env.DSTACK_PROVIDER;
+  if (!value) return undefined;
+  if (value === "gemini" || value === "fake") return value;
+  throw new ConfigError("DSTACK_PROVIDER must be either 'gemini' or 'fake'");
 }
 
 async function readConfigFile(configPath: string): Promise<ConfigFile> {

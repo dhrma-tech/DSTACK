@@ -1,0 +1,26 @@
+name: retro
+description: Produce a structured retrospective and persist learning entries.
+triggerPhrases: ["retro", "retrospective", "post-mortem"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["ship"]
+allowedTools: ["read_file", "list_files", "git_log"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["cycleStart", "cycleEnd", "estimatedDurationDays", "wentWell", "wentPoorly", "processMetrics", "keyDecisions", "learningEntries", "nextCycleRecommendations"]
+  properties:
+    cycleStart: { type: string }
+    cycleEnd: { type: string }
+    estimatedDurationDays: { type: number }
+    wentWell: { type: array }
+    wentPoorly: { type: array }
+    processMetrics: { type: object }
+    keyDecisions: { type: array }
+    learningEntries: { type: array }
+    nextCycleRecommendations: { type: array }
+artifactPath: retro
+nextSkill: setup-memory
+failureCases: ["ship missing"]
+acceptanceCriteria: ["Learning entries written", "Metrics computed from artifacts"]
+systemPromptFile: prompt.md

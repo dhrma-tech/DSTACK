@@ -1,0 +1,27 @@
+name: scrape
+description: Scrape structured data from URLs with robots and sensitive-path safety.
+triggerPhrases: ["scrape", "extract data from URL", "collect data from site"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["browser_open", "browser_snapshot", "browser_screenshot", "browser_get_logs", "write_file"]
+inputs:
+  - { name: url, type: string, required: false, description: URL }
+  - { name: urls, type: string, required: false, description: Comma-separated URLs }
+  - { name: fields, type: string, required: false, description: Comma-separated fields }
+outputSchema:
+  type: object
+  required: ["requestedUrls", "scrapedUrls", "skippedUrls", "robotsRespected", "data", "dataFilePath", "warnings"]
+  properties:
+    requestedUrls: { type: array }
+    scrapedUrls: { type: array }
+    skippedUrls: { type: array }
+    robotsRespected: { type: boolean }
+    data: { type: array }
+    dataFilePath: { type: string }
+    warnings: { type: array }
+artifactPath: scrape
+nextSkill: null
+failureCases: ["All URLs fail", "Authentication required"]
+acceptanceCriteria: ["robots.txt respected", "Data file separate from artifact"]
+systemPromptFile: prompt.md

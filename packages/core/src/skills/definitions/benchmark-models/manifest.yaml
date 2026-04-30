@@ -1,0 +1,24 @@
+name: benchmark-models
+description: Compare multiple models on the same benchmark suite.
+triggerPhrases: ["benchmark models", "compare models", "model comparison"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file"]
+inputs:
+  - { name: suite, type: string, required: true, description: Benchmark suite name }
+  - { name: models, type: string, required: false, description: Comma-separated model names }
+outputSchema:
+  type: object
+  required: ["suiteName", "modelsCompared", "runAt", "modelResults", "recommendation"]
+  properties:
+    suiteName: { type: string }
+    modelsCompared: { type: array }
+    runAt: { type: string }
+    modelResults: { type: array }
+    recommendation: { type: object }
+artifactPath: benchmark-models
+nextSkill: null
+failureCases: ["Unknown model", "Rate limit"]
+acceptanceCriteria: ["Identical prompts", "Recommendation populated"]
+systemPromptFile: prompt.md

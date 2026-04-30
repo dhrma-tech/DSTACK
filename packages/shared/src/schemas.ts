@@ -50,6 +50,7 @@ export const dstackConfigSchema = z.object({
   projectRoot: z.string(),
   dstackDir: z.string(),
   geminiApiKey: z.string().nullable(),
+  provider: z.enum(["gemini", "fake"]),
   defaultModel: z.string(),
   proModel: z.string(),
   maxTokens: z.number().int().positive(),

@@ -1,0 +1,23 @@
+name: dstack-upgrade
+description: Check DStack upgrade plan and migrations.
+triggerPhrases: ["upgrade dstack", "update dstack", "dstack upgrade"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["run_command", "read_file", "write_file"]
+inputs: [{ name: latestVersion, type: string, required: false, description: Override latest version for tests }]
+outputSchema:
+  type: object
+  required: ["currentVersion", "latestVersion", "isUpToDate", "changelogSummary", "breakingChanges", "requiredMigrations", "upgradeApproved", "upgradeExecuted", "postUpgradeVerification"]
+  properties:
+    currentVersion: { type: string }
+    latestVersion: { type: string }
+    isUpToDate: { type: boolean }
+    changelogSummary: { type: string }
+    breakingChanges: { type: array }
+    requiredMigrations: { type: array }
+artifactPath: dstack-upgrade
+nextSkill: health
+failureCases: ["npm registry unreachable"]
+acceptanceCriteria: ["Upgrade requires approval", "Backup checkpoint planned"]
+systemPromptFile: prompt.md

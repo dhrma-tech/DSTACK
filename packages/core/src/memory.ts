@@ -54,7 +54,8 @@ export class ArtifactStore {
   async write(skillName: string, payload: JsonObject): Promise<Artifact> {
     const skillDir = path.join(this.artifactRoot, skillName);
     await ensureDir(skillDir);
-    const body = JSON.stringify({ ...payload, generatedAt: payload.generatedAt ?? nowIso() }, null, 2);
+    const generatedAt = typeof payload.generatedAt === "string" && !Number.isNaN(Date.parse(payload.generatedAt)) ? payload.generatedAt : nowIso();
+    const body = JSON.stringify({ ...payload, generatedAt }, null, 2);
     const id = `${fileSafeTimestamp()}-${shortHash(body)}`;
     const filePath = path.join(skillDir, `${id}.json`);
     await atomicWrite(filePath, body);

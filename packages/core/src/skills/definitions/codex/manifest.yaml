@@ -1,0 +1,28 @@
+name: codex
+description: Format a DStack artifact as a Codex CLI task prompt.
+triggerPhrases: ["codex", "implement with codex", "send to codex"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "run_command", "git_status"]
+inputs:
+  - { name: artifact, type: string, required: true, description: Source artifact }
+  - { name: task, type: string, required: false, description: Specific task ID }
+outputSchema:
+  type: object
+  required: ["sourceArtifact", "taskExtracted", "codexPrompt", "codexCommand", "codexOutput", "codexExitCode", "codexVerdict", "filesModified", "warnings"]
+  properties:
+    sourceArtifact: { type: string }
+    taskExtracted: { type: string }
+    codexPrompt: { type: string }
+    codexCommand: { type: string }
+    codexOutput: { type: string }
+    codexExitCode: { type: number }
+    codexVerdict: { type: string }
+    filesModified: { type: array }
+    warnings: { type: array }
+artifactPath: codex
+nextSkill: review
+failureCases: ["Codex not installed"]
+acceptanceCriteria: ["Graceful NOT_INSTALLED", "Prompt scoped"]
+systemPromptFile: prompt.md

@@ -1,0 +1,26 @@
+name: make-pdf
+description: Export one or more DStack artifacts to a PDF report.
+triggerPhrases: ["make pdf", "export pdf", "generate report pdf"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "write_file"]
+inputs:
+  - { name: artifact, type: string, required: false, description: Artifact skill name }
+  - { name: artifacts, type: string, required: false, description: Comma-separated artifact skill names }
+  - { name: title, type: string, required: false, description: Report title }
+outputSchema:
+  type: object
+  required: ["title", "artifactsIncluded", "pageCount", "pdfPath", "fileSizeKb", "generatedAt"]
+  properties:
+    title: { type: string }
+    artifactsIncluded: { type: array }
+    pageCount: { type: number }
+    pdfPath: { type: string }
+    fileSizeKb: { type: number }
+    generatedAt: { type: string }
+artifactPath: make-pdf
+nextSkill: null
+failureCases: ["Artifact not found", "PDF render fails"]
+acceptanceCriteria: ["Valid PDF file", "TOC for multi-artifact PDFs"]
+systemPromptFile: prompt.md

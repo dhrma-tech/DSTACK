@@ -1,0 +1,23 @@
+name: design-shotgun
+description: Generate three distinct design directions for a screen or feature.
+triggerPhrases: ["design options", "design variants", "shotgun design"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["design-consultation", "plan-eng-review"]
+allowedTools: ["read_file", "search_files"]
+inputs:
+  - { name: screen, type: string, required: false, description: Screen name }
+  - { name: feature, type: string, required: false, description: Feature description }
+outputSchema:
+  type: object
+  required: ["subject", "variants", "recommendation", "decisionCriteria"]
+  properties:
+    subject: { type: string }
+    variants: { type: array }
+    recommendation: { type: string }
+    decisionCriteria: { type: array }
+artifactPath: design-shotgun
+nextSkill: design-html
+failureCases: ["screen not found", "variants too similar"]
+acceptanceCriteria: ["Exactly three variants", "Recommendation produced"]
+systemPromptFile: prompt.md

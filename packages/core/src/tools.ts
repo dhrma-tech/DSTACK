@@ -36,7 +36,7 @@ export class ToolExecutor {
   private calls = 0;
   private readonly gate: PermissionGate;
   constructor(private readonly registry: ToolRegistry, private readonly options: { projectRoot: string; config: DStackConfig; logger: SessionLogger | null; interactive: boolean }) {
-    this.gate = new PermissionGate({ interactive: options.interactive });
+    this.gate = new PermissionGate({ interactive: options.interactive, dstackDir: options.config.dstackDir });
   }
   async dispatch(toolCall: ToolCall): Promise<ToolResult> {
     this.calls += 1;

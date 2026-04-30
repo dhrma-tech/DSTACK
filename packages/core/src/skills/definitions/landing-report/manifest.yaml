@@ -1,0 +1,33 @@
+name: landing-report
+description: Analyze landing page copy, CTA visibility, performance, links, and errors.
+triggerPhrases: ["landing report", "analyze landing page", "check landing page"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["browser_open", "browser_snapshot", "browser_screenshot", "browser_get_logs"]
+inputs: [{ name: url, type: string, required: true, description: Landing page URL }]
+outputSchema:
+  type: object
+  required: ["url", "analyzedAt", "desktopScreenshotPath", "mobileScreenshotPath", "performanceMetrics", "performanceVerdict", "aboveFoldAnalysis", "mobileAnalysis", "copyIssues", "accessibilityIssues", "brokenLinks", "consoleErrors", "networkErrors", "overallScore", "overallVerdict", "topRecommendations"]
+  properties:
+    url: { type: string }
+    analyzedAt: { type: string }
+    desktopScreenshotPath: { type: string }
+    mobileScreenshotPath: { type: string }
+    performanceMetrics: { type: object }
+    performanceVerdict: { type: string }
+    aboveFoldAnalysis: { type: object }
+    mobileAnalysis: { type: object }
+    copyIssues: { type: array }
+    accessibilityIssues: { type: array }
+    brokenLinks: { type: array }
+    consoleErrors: { type: array }
+    networkErrors: { type: array }
+    overallScore: { type: number }
+    overallVerdict: { type: string }
+    topRecommendations: { type: array }
+artifactPath: landing-report
+nextSkill: null
+failureCases: ["URL unreachable", "Authentication required"]
+acceptanceCriteria: ["Desktop and mobile screenshots", "Score formula documented"]
+systemPromptFile: prompt.md

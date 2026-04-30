@@ -1,0 +1,29 @@
+name: pair-agent
+description: Run a checkpointed autonomous browser task with audit screenshots.
+triggerPhrases: ["pair agent", "browser agent", "automate this"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: []
+allowedTools: ["browser_open", "browser_snapshot", "browser_screenshot", "browser_click", "browser_type", "browser_get_logs"]
+inputs:
+  - { name: task, type: string, required: true, description: Browser task }
+  - { name: session, type: string, required: false, description: Session name }
+  - { name: max-steps, type: number, required: false, description: Max steps }
+  - { name: checkpoint-every, type: number, required: false, description: Checkpoint interval }
+outputSchema:
+  type: object
+  required: ["task", "sessionName", "plannedSteps", "executedSteps", "stepsCompleted", "stepsPlanned", "taskVerdict", "checkpointsPassed", "auditLogPath"]
+  properties:
+    task: { type: string }
+    plannedSteps: { type: array }
+    executedSteps: { type: array }
+    stepsCompleted: { type: number }
+    stepsPlanned: { type: number }
+    taskVerdict: { type: string }
+    checkpointsPassed: { type: number }
+    auditLogPath: { type: string }
+artifactPath: pair-agent
+nextSkill: null
+failureCases: ["User stops", "Max steps reached"]
+acceptanceCriteria: ["Screenshot after every action", "Audit log written"]
+systemPromptFile: prompt.md

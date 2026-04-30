@@ -1,0 +1,26 @@
+name: devex-review
+description: Review the actual codebase for developer experience quality.
+triggerPhrases: ["devex review", "check developer experience"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["autoplan"]
+allowedTools: ["read_file", "list_files", "search_files", "run_command", "git_status"]
+inputs: [{ name: measure-start-time, type: boolean, required: false, description: Measure dev start time }]
+outputSchema:
+  type: object
+  required: ["overallScore", "overallVerdict", "categories", "readmeScore", "readmeGaps", "envSetupScore", "envSetupGaps", "testRunTime", "criticalIssues", "mustFixBeforeProceeding"]
+  properties:
+    overallScore: { type: number }
+    overallVerdict: { type: string, enum: ["PASS", "REVISE", "FAIL"] }
+    categories: { type: array }
+    readmeScore: { type: number }
+    readmeGaps: { type: array }
+    envSetupScore: { type: number }
+    envSetupGaps: { type: array }
+    criticalIssues: { type: array }
+    mustFixBeforeProceeding: { type: array }
+artifactPath: devex-review
+nextSkill: qa
+failureCases: ["No README", "start command times out"]
+acceptanceCriteria: ["All five categories scored", "Reads repo files"]
+systemPromptFile: prompt.md

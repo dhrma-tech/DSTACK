@@ -1,0 +1,20 @@
+name: unfreeze
+description: Lift an active deploy freeze.
+triggerPhrases: ["unfreeze", "lift freeze", "unfreeze deploys"]
+model: none
+streaming: false
+requiresArtifacts: []
+allowedTools: []
+inputs: []
+outputSchema:
+  type: object
+  required: ["frozen", "unfrozenAt", "previousFreezeReason", "previousFrozenSince"]
+  properties:
+    frozen: { type: boolean }
+    unfrozenAt: { type: string }
+    previousFrozenSince: { type: string }
+artifactPath: unfreeze
+nextSkill: null
+failureCases: ["No active freeze"]
+acceptanceCriteria: ["Deploy freeze gate opens after unfreeze"]
+systemPromptFile: prompt.md

@@ -1,0 +1,1 @@
+Skill: /pair-agent

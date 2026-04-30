@@ -1,0 +1,24 @@
+name: plan-design-review
+description: Review an autoplan artifact from a design and UX lens.
+triggerPhrases: ["review plan for design", "design plan review"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["autoplan", "plan-eng-review"]
+allowedTools: ["read_file", "list_files"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["overallVerdict", "planDesignGaps", "accessibilityFlags", "sequencingIssues", "undefinedDeliverables", "phaseReviews", "mustFixBeforeProceeding"]
+  properties:
+    overallVerdict: { type: string, enum: ["PASS", "REVISE", "FAIL"] }
+    planDesignGaps: { type: array }
+    accessibilityFlags: { type: array }
+    sequencingIssues: { type: array }
+    undefinedDeliverables: { type: array }
+    phaseReviews: { type: array }
+    mustFixBeforeProceeding: { type: array }
+artifactPath: plan-design-review
+nextSkill: design-consultation
+failureCases: ["autoplan missing", "plan-eng-review missing"]
+acceptanceCriteria: ["Every UI phase reviewed", "PASS only with no must-fix items"]
+systemPromptFile: prompt.md

@@ -1,11 +1,13 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import type { JsonValue, SkillInvocation } from "@dstack/shared";
+import type { JsonValue, ProviderName, SkillInvocation } from "@dstack/shared";
 
 export interface ParsedCommand {
   help: boolean;
   version: boolean;
   listSkills: boolean;
+  json: boolean;
+  verbose: boolean;
   invocation: SkillInvocation | null;
 }
 
@@ -21,10 +23,13 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("dry-run", { type: "boolean", default: false })
     .option("no-stream", { type: "boolean", default: false })
     .option("model", { type: "string" })
+    .option("provider", { type: "string", choices: ["gemini", "fake"] })
+    .option("json", { type: "boolean", default: false })
+    .option("verbose", { type: "boolean", default: false })
     .option("allow-secrets", { type: "boolean", default: false })
     .parse();
   const skillName = parsed._.map(String)[0] ?? null;
-  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "force", "dry-run", "no-stream", "model", "allow-secrets"]);
+  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
   const inputs: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!reserved.has(key) && isJsonValue(value)) inputs[key] = value;
@@ -33,15 +38,28 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed.version !== true),
     version: parsed.version === true,
     listSkills: parsed["list-skills"] === true,
+    json: parsed.json === true,
+    verbose: parsed.verbose === true,
     invocation: skillName
       ? {
           skillName,
           inputs,
-          flags: { force: parsed.force === true, dryRun: parsed["dry-run"] === true, noStream: parsed["no-stream"] === true, model: typeof parsed.model === "string" ? parsed.model : null, allowSecrets: parsed["allow-secrets"] === true },
+          flags: {
+            force: parsed.force === true,
+            dryRun: parsed["dry-run"] === true,
+            noStream: parsed["no-stream"] === true,
+            model: typeof parsed.model === "string" ? parsed.model : null,
+            provider: isProviderName(parsed.provider) ? parsed.provider : null,
+            allowSecrets: parsed["allow-secrets"] === true
+          },
           projectRoot
         }
       : null
   };
+}
+
+function isProviderName(value: unknown): value is ProviderName {
+  return value === "gemini" || value === "fake";
 }
 
 function isJsonValue(value: unknown): value is JsonValue {

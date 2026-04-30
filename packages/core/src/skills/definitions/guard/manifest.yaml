@@ -1,0 +1,23 @@
+name: guard
+description: Activate GUARD read-only safety mode.
+triggerPhrases: ["guard mode", "activate guard", "read-only mode"]
+model: none
+streaming: false
+requiresArtifacts: []
+allowedTools: ["read_file"]
+inputs: [{ name: reason, type: string, required: false, description: Optional reason }]
+outputSchema:
+  type: object
+  required: ["previousMode", "newMode", "activatedAt", "blockedOperations", "allowedOperations", "deactivationCommand"]
+  properties:
+    previousMode: { type: string }
+    newMode: { type: string, enum: ["GUARD"] }
+    activatedAt: { type: string }
+    blockedOperations: { type: array }
+    allowedOperations: { type: array }
+    deactivationCommand: { type: string }
+artifactPath: guard
+nextSkill: careful
+failureCases: ["Safety mode file write fails"]
+acceptanceCriteria: ["Mode persists", "PermissionGate reads mode per call"]
+systemPromptFile: prompt.md

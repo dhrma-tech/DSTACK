@@ -1,0 +1,25 @@
+name: design-html
+description: Render a self-contained HTML design prototype.
+triggerPhrases: ["generate HTML", "make prototype", "html design"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["design-consultation"]
+allowedTools: ["read_file", "write_file"]
+inputs:
+  - { name: screen, type: string, required: false, description: Screen name }
+  - { name: variant, type: string, required: false, description: Variant name }
+outputSchema:
+  type: object
+  required: ["screenName", "variantName", "htmlFilePath", "componentsCovered", "accessibilityNotes", "knownLimitations", "viewInstructions"]
+  properties:
+    screenName: { type: string }
+    htmlFilePath: { type: string }
+    componentsCovered: { type: array }
+    accessibilityNotes: { type: array }
+    knownLimitations: { type: array }
+    viewInstructions: { type: string }
+artifactPath: design-html
+nextSkill: design-review
+failureCases: ["Screen not found", "HTML validation fails"]
+acceptanceCriteria: ["Self-contained HTML", "Mobile safe"]
+systemPromptFile: prompt.md

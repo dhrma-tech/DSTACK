@@ -1,0 +1,24 @@
+name: setup-memory
+description: Update DStack memory and optionally import retro learnings.
+triggerPhrases: ["setup memory", "update memory", "expand memory"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "write_file"]
+inputs: [{ name: import-retro, type: boolean, required: false, description: Import latest retro }]
+outputSchema:
+  type: object
+  required: ["updatedFields", "addedDecisions", "addedDomainTerms", "importedFromRetro", "memoryFilePath", "previousMemoryHash", "newMemoryHash"]
+  properties:
+    updatedFields: { type: array }
+    addedDecisions: { type: number }
+    addedDomainTerms: { type: number }
+    importedFromRetro: { type: boolean }
+    memoryFilePath: { type: string }
+    previousMemoryHash: { type: string }
+    newMemoryHash: { type: string }
+artifactPath: setup-memory
+nextSkill: office-hours
+failureCases: ["memory.json corrupted", "retro missing when importing"]
+acceptanceCriteria: ["Memory hash changes", "No deletes without confirmation"]
+systemPromptFile: prompt.md

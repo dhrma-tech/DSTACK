@@ -1,0 +1,30 @@
+name: skillify
+description: Generate a draft DStack skill in .dstack/generated-skills.
+triggerPhrases: ["create skill", "skillify", "make a skill"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "write_file", "list_files"]
+inputs:
+  - { name: name, type: string, required: true, description: Skill name }
+  - { name: description, type: string, required: true, description: Skill description }
+  - { name: model, type: string, required: false, description: Model }
+  - { name: tools, type: string, required: false, description: Tools }
+outputSchema:
+  type: object
+  required: ["skillName", "manifestPath", "handlerPath", "generatedModel", "generatedTools", "schemaValid", "schemaValidationErrors", "installInstructions", "warnings"]
+  properties:
+    skillName: { type: string }
+    manifestPath: { type: string }
+    handlerPath: { type: string }
+    generatedModel: { type: string }
+    generatedTools: { type: array }
+    schemaValid: { type: boolean }
+    schemaValidationErrors: { type: array }
+    installInstructions: { type: string }
+    warnings: { type: array }
+artifactPath: skillify
+nextSkill: null
+failureCases: ["Skill conflict", "Write fails"]
+acceptanceCriteria: ["Draft only", "Manifest schema valid"]
+systemPromptFile: prompt.md

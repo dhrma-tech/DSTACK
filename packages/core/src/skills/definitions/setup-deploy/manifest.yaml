@@ -1,0 +1,29 @@
+name: setup-deploy
+description: Configure deployment and write .dstack/deploy.json.
+triggerPhrases: ["setup deploy", "configure deployment", "deploy config"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "list_files", "run_command", "write_file"]
+inputs:
+  - { name: platform, type: string, required: false, description: Platform }
+  - { name: env, type: string, required: false, description: Environment }
+  - { name: command, type: string, required: false, description: Deploy command }
+outputSchema:
+  type: object
+  required: ["platform", "environment", "deployCommand", "dryRunCommand", "healthCheckUrl", "rollbackCommand", "requiredEnvVars", "deployConfigPath", "dryRunResult", "dryRunOutput", "warnings"]
+  properties:
+    platform: { type: string }
+    environment: { type: string }
+    deployCommand: { type: string }
+    dryRunCommand: { type: string }
+    requiredEnvVars: { type: array }
+    deployConfigPath: { type: string }
+    dryRunResult: { type: string }
+    dryRunOutput: { type: string }
+    warnings: { type: array }
+artifactPath: setup-deploy
+nextSkill: land-and-deploy
+failureCases: ["Dry run command fails"]
+acceptanceCriteria: ["deploy.json written", "No env values stored"]
+systemPromptFile: prompt.md
