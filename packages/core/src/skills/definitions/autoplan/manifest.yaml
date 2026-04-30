@@ -1,0 +1,23 @@
+name: autoplan
+description: Generate a phased implementation plan from the Project Brief.
+triggerPhrases: ["generate plan", "make a plan"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["office-hours"]
+allowedTools: ["read_file", "list_files", "git_status", "git_log", "search_files"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["planVersion", "generatedAt", "phases", "openDecisions", "riskFlags", "assumptionsMade"]
+  properties:
+    planVersion: { type: string }
+    generatedAt: { type: string }
+    phases: { type: array }
+    openDecisions: { type: array, items: { type: string } }
+    riskFlags: { type: array, items: { type: string } }
+    assumptionsMade: { type: array, items: { type: string } }
+artifactPath: autoplan
+nextSkill: plan-ceo-review
+failureCases: ["No office-hours artifact"]
+acceptanceCriteria: ["Phases, tasks, risks, assumptions present"]
+systemPromptFile: prompt.md

@@ -1,0 +1,24 @@
+name: investigate
+description: Root cause analysis for a failure or bug.
+triggerPhrases: ["investigate", "debug"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "search_files", "git_log", "git_diff", "run_command"]
+inputs: [{ name: issue, type: string, required: false, description: Issue description }]
+outputSchema:
+  type: object
+  required: ["issue", "rootCause", "confidence", "relevantFiles", "executionTrace", "proposedFix", "alternativeHypotheses"]
+  properties:
+    issue: { type: string }
+    rootCause: { type: string }
+    confidence: { type: string, enum: ["high", "medium", "low"] }
+    relevantFiles: { type: array, items: { type: string } }
+    executionTrace: { type: array, items: { type: string } }
+    proposedFix: { type: object }
+    alternativeHypotheses: { type: array, items: { type: string } }
+artifactPath: investigate
+nextSkill: review
+failureCases: ["No issue context"]
+acceptanceCriteria: ["Root cause specific", "Confidence calibrated"]
+systemPromptFile: prompt.md

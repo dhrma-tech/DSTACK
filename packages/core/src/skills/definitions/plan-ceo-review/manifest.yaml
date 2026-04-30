@@ -1,0 +1,22 @@
+name: plan-ceo-review
+description: Product and strategy review of the plan.
+triggerPhrases: ["ceo review", "product review"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["autoplan"]
+allowedTools: ["read_file"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["overallVerdict", "phaseReviews", "globalConcerns", "mustFixBeforeProceeding", "approvedAspects"]
+  properties:
+    overallVerdict: { type: string, enum: ["PASS", "REVISE", "FAIL"] }
+    phaseReviews: { type: array }
+    globalConcerns: { type: array, items: { type: string } }
+    mustFixBeforeProceeding: { type: array, items: { type: string } }
+    approvedAspects: { type: array, items: { type: string } }
+artifactPath: plan-ceo-review
+nextSkill: plan-eng-review
+failureCases: ["Plan missing fields"]
+acceptanceCriteria: ["Every phase reviewed", "Verdict clear"]
+systemPromptFile: prompt.md

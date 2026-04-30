@@ -1,0 +1,24 @@
+name: qa
+description: Full QA pass combining static analysis, tests, and optional browser evidence.
+triggerPhrases: ["qa", "test everything"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: ["autoplan"]
+allowedTools: ["read_file", "list_files", "search_files", "git_status", "git_diff", "run_command", "browser_open", "browser_snapshot", "browser_screenshot", "browser_click", "browser_get_logs"]
+inputs: [{ name: url, type: string, required: false, description: Optional URL }]
+outputSchema:
+  type: object
+  required: ["passedChecks", "failedChecks", "testResults", "browserFindings", "overallVerdict", "blockers", "recommendations"]
+  properties:
+    passedChecks: { type: array, items: { type: string } }
+    failedChecks: { type: array }
+    testResults: { type: object }
+    browserFindings: { type: array }
+    overallVerdict: { type: string, enum: ["PASS", "FAIL"] }
+    blockers: { type: array, items: { type: string } }
+    recommendations: { type: array, items: { type: string } }
+artifactPath: qa
+nextSkill: ship
+failureCases: ["Test runner not found"]
+acceptanceCriteria: ["Test results present", "No PASS with critical failures"]
+systemPromptFile: prompt.md

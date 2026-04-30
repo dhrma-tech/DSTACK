@@ -1,0 +1,26 @@
+name: office-hours
+description: Structured discovery session that captures a project brief and seeds memory.
+triggerPhrases: ["I have an idea", "new feature"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "list_files", "git_status"]
+inputs: [{ name: idea, type: string, required: false, description: Initial idea }]
+outputSchema:
+  type: object
+  required: ["projectName", "summary", "targetUsers", "coreProblem", "successMetrics", "techStack", "constraints", "outOfScope", "openQuestions"]
+  properties:
+    projectName: { type: string }
+    summary: { type: string }
+    targetUsers: { type: array, items: { type: string } }
+    coreProblem: { type: string }
+    successMetrics: { type: array, items: { type: string } }
+    techStack: { type: object }
+    constraints: { type: array, items: { type: string } }
+    outOfScope: { type: array, items: { type: string } }
+    openQuestions: { type: array, items: { type: string } }
+artifactPath: office-hours
+nextSkill: autoplan
+failureCases: ["No meaningful input"]
+acceptanceCriteria: ["Project brief written", "memory.json updated"]
+systemPromptFile: prompt.md

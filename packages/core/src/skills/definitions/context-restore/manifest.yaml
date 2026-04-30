@@ -1,0 +1,22 @@
+name: context-restore
+description: Restore latest artifact pointers from a named checkpoint without changing git state.
+triggerPhrases: ["restore context", "load checkpoint"]
+model: gemini-2.0-flash-001
+streaming: false
+requiresArtifacts: []
+allowedTools: ["read_file", "list_files"]
+inputs: [{ name: name, type: string, required: true, description: Checkpoint name }]
+outputSchema:
+  type: object
+  required: ["checkpointName", "restoredAt", "artifactsRestored", "gitHeadAtSave", "note"]
+  properties:
+    checkpointName: { type: string }
+    restoredAt: { type: string }
+    artifactsRestored: { type: array, items: { type: string } }
+    gitHeadAtSave: { type: string }
+    note: { type: string }
+artifactPath: context-restore
+nextSkill: null
+failureCases: ["Checkpoint not found"]
+acceptanceCriteria: ["Artifacts restored", "Git mismatch disclosed"]
+systemPromptFile: prompt.md

@@ -1,0 +1,23 @@
+name: ship
+description: Final ship gate.
+triggerPhrases: ["ship it", "deploy", "release"]
+model: gemini-2.0-flash-001
+streaming: true
+requiresArtifacts: ["qa", "review"]
+allowedTools: ["git_status", "git_diff", "git_log", "run_command", "read_file"]
+inputs: [{ name: deploy, type: boolean, required: false, description: Run deploy command }]
+outputSchema:
+  type: object
+  required: ["shippable", "gateResults", "blockers", "changelogEntry", "suggestedTag", "deployCommand", "deployedAt"]
+  properties:
+    shippable: { type: boolean }
+    gateResults: { type: array }
+    blockers: { type: array, items: { type: string } }
+    changelogEntry: { type: string }
+    suggestedTag: { type: string }
+    deployCommand: { type: string }
+artifactPath: ship
+nextSkill: context-save
+failureCases: ["QA failed", "Secrets detected", "Dirty branch"]
+acceptanceCriteria: ["Every gate reported", "No ship without QA PASS"]
+systemPromptFile: prompt.md

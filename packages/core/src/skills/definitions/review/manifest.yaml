@@ -1,0 +1,22 @@
+name: review
+description: Review current code changes from git diff.
+triggerPhrases: ["review my code", "code review"]
+model: gemini-2.5-pro-preview
+streaming: true
+requiresArtifacts: []
+allowedTools: ["read_file", "git_diff", "git_status", "git_log", "search_files"]
+inputs: []
+outputSchema:
+  type: object
+  required: ["reviewedFiles", "fileReviews", "overallVerdict", "summary", "criticalIssues"]
+  properties:
+    reviewedFiles: { type: array, items: { type: string } }
+    fileReviews: { type: array }
+    overallVerdict: { type: string, enum: ["PASS", "REVISE", "FAIL"] }
+    summary: { type: string }
+    criticalIssues: { type: array, items: { type: string } }
+artifactPath: review
+nextSkill: qa
+failureCases: ["No diff"]
+acceptanceCriteria: ["Correctness and security assessed"]
+systemPromptFile: prompt.md

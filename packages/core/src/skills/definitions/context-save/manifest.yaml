@@ -1,0 +1,23 @@
+name: context-save
+description: Save latest artifacts, memory, git HEAD, and branch into a checkpoint.
+triggerPhrases: ["save context", "checkpoint"]
+model: gemini-2.0-flash-001
+streaming: false
+requiresArtifacts: []
+allowedTools: ["read_file", "git_status", "git_log"]
+inputs: [{ name: name, type: string, required: false, description: Checkpoint name }]
+outputSchema:
+  type: object
+  required: ["name", "savedAt", "gitHead", "branch", "artifactPointers", "summary"]
+  properties:
+    name: { type: string }
+    savedAt: { type: string }
+    gitHead: { type: string }
+    branch: { type: string }
+    artifactPointers: { type: object }
+    summary: { type: string }
+artifactPath: context-save
+nextSkill: null
+failureCases: ["No artifacts"]
+acceptanceCriteria: ["Checkpoint restorable"]
+systemPromptFile: prompt.md
