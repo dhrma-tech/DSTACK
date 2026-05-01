@@ -125,10 +125,16 @@ async function listFiles(projectRoot: string, dir: string): Promise<string[]> {
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (entry.name.startsWith(".") || ["node_modules", "dist", "coverage"].includes(entry.name)) continue;
     const full = path.join(root, entry.name);
+    if (isBrowserSessionPath(projectRoot, full)) continue;
     if (entry.isDirectory()) files.push(...(await listFiles(projectRoot, path.relative(projectRoot, full))));
     else files.push(path.relative(projectRoot, full).replace(/\\/g, "/"));
   }
   return files;
+}
+
+function isBrowserSessionPath(projectRoot: string, fullPath: string): boolean {
+  const relative = path.relative(projectRoot, fullPath).replace(/\\/g, "/");
+  return relative === ".dstack/browser/sessions" || relative.startsWith(".dstack/browser/sessions/");
 }
 
 async function searchFiles(projectRoot: string, pattern: string): Promise<Array<{ file: string; line: number; content: string }>> {

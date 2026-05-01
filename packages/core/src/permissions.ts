@@ -56,7 +56,7 @@ function decisionFor(toolCall: ToolCall): PermissionDecision {
   if (["write_file", "edit_file", "git_commit", "git_create_branch"].includes(toolCall.name)) return "REQUIRE_APPROVAL";
   if (toolCall.name === "browser_open" && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(String(toolCall.input.url ?? ""))) return "REQUIRE_APPROVAL";
   if (toolCall.name === "read_file" && /(^|[\\/])\.env(\..*)?$/i.test(String(toolCall.input.path ?? ""))) return "DENY";
-  if (toolCall.name === "read_file" && /(^|[\\/])\.dstack[\\/]browser[\\/]sessions[\\/][^\\/]+[\\/]cookies\.json$/i.test(String(toolCall.input.path ?? ""))) return "DENY";
+  if (toolCall.name === "read_file" && /(^|[\\/])\.dstack[\\/]browser[\\/]sessions([\\/]|$)/i.test(String(toolCall.input.path ?? ""))) return "DENY";
   return "ALLOW";
 }
 
