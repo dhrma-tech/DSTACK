@@ -583,6 +583,10 @@ describe("Phase 2 hardening pass", () => {
       const landing = await executor.run(invocation("/landing-report", workspace.root, { url: landingUrl }));
       expect(landing.output?.overallVerdict).toBe("PASS");
       expect(String(landing.output?.desktopScreenshotPath)).toContain(".dstack");
+      expect(JSON.stringify(landing.output?.aboveFoldAnalysis)).toContain("ctaCandidates");
+      expect(JSON.stringify(landing.output?.linkSummary)).toContain("checkedLinks");
+      expect(JSON.stringify(landing.output?.copyMetrics)).toContain("wordCount");
+      expect(JSON.stringify(landing.output?.viewportFindings)).toContain("375");
       expect(JSON.stringify(landing.output?.aboveFoldAnalysis)).toContain("ctaIsAboveFold");
       expect(JSON.stringify(landing.output?.mobileAnalysis)).toContain("horizontalScrollPresent");
       expect(String(landing.output?.scoreFormula)).toContain("broken links");

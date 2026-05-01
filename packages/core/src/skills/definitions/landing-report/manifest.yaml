@@ -18,6 +18,9 @@ outputSchema:
     performanceVerdict: { type: string }
     aboveFoldAnalysis: { type: object }
     mobileAnalysis: { type: object }
+    viewportFindings: { type: object }
+    linkSummary: { type: object }
+    copyMetrics: { type: object }
     copyIssues: { type: array }
     accessibilityIssues: { type: array }
     brokenLinks: { type: array }

@@ -85,7 +85,8 @@ export class LandingReportAnalyzer {
         };
       }) as LandingDomSnapshot;
       const headlineText = desktop.headline;
-      const firstCta = desktop.ctas[0] ?? null;
+      const ctaCandidates = rankCtas(desktop.ctas).slice(0, 5);
+      const firstCta = ctaCandidates[0] ?? null;
       const ctaText = firstCta?.text || null;
       const links = unique(desktop.links).slice(0, 40);
       const brokenLinks = await checkLinks(page.context().request, links);
@@ -111,6 +112,7 @@ export class LandingReportAnalyzer {
       }) as LandingMobileSnapshot;
       await page.screenshot({ path: mobileScreenshotPath, fullPage: true });
       const copyIssues = copyIssuesFor(headlineText, ctaText);
+      const copyMetrics = copyMetricsFor(headlineText, ctaText, copyIssues);
       const accessibilityIssues = [
         ...(headlineText ? [] : ["Missing h1 heading."]),
         ...(desktop.imagesMissingAlt > 0 ? [`${desktop.imagesMissingAlt} image(s) missing alt text.`] : []),
@@ -134,8 +136,11 @@ export class LandingReportAnalyzer {
         mobileScreenshotPath,
         performanceMetrics: desktop.performance,
         performanceVerdict: performanceVerdict(desktop.performance.pageWeightKb, desktop.performance.fcp),
-        aboveFoldAnalysis: { hasHeadline: Boolean(headlineText), headlineText, hasCTA: Boolean(ctaText), ctaText, ctaIsAboveFold: Boolean(firstCta && firstCta.top <= 760), valuePropositionClarity: clarityScore(headlineText) },
+        aboveFoldAnalysis: { hasHeadline: Boolean(headlineText), headlineText, hasCTA: Boolean(ctaText), ctaText, ctaIsAboveFold: Boolean(firstCta && firstCta.top <= 760), valuePropositionClarity: clarityScore(headlineText), ctaCandidates: ctaCandidates as unknown as JsonObject[] },
         mobileAnalysis: mobile,
+        viewportFindings: { desktop: { width: 1440, height: 1000, screenshotPath: desktopScreenshotPath }, mobile: { width: 375, height: 812, screenshotPath: mobileScreenshotPath } },
+        linkSummary: { totalLinks: desktop.links.length, checkedLinks: links.length, brokenCount: brokenLinks.length },
+        copyMetrics,
         copyIssues,
         accessibilityIssues,
         brokenLinks,
@@ -158,6 +163,11 @@ interface LandingCtaSnapshot {
   width: number;
   height: number;
   href: string;
+}
+
+interface RankedCtaSnapshot extends LandingCtaSnapshot {
+  score: number;
+  reason: string;
 }
 
 interface LandingDomSnapshot {
@@ -196,6 +206,33 @@ function copyIssuesFor(headline: string, ctaText: string | null): string[] {
   if (!ctaText) issues.push("Missing primary CTA.");
   if (ctaText && /^(click here|learn more|submit)$/i.test(ctaText.trim())) issues.push(`CTA text "${ctaText}" is vague.`);
   return issues;
+}
+
+function rankCtas(ctas: LandingCtaSnapshot[]): RankedCtaSnapshot[] {
+  return ctas.map((cta) => {
+    const actionLanguage = /\b(start|get|try|buy|book|schedule|deploy|ship|sign|join|contact|download)\b/i.test(cta.text) ? 30 : 0;
+    const aboveFold = cta.top >= 0 && cta.top <= 760 ? 25 : 0;
+    const visibleSize = cta.width >= 80 && cta.height >= 36 ? 20 : 0;
+    const hrefIntent = /signup|start|demo|pricing|contact|checkout/i.test(cta.href) ? 15 : 0;
+    const vaguePenalty = /^(learn more|click here|read more)$/i.test(cta.text.trim()) ? -12 : 0;
+    const score = actionLanguage + aboveFold + visibleSize + hrefIntent + vaguePenalty;
+    const reason = [
+      actionLanguage ? "action language" : null,
+      aboveFold ? "above fold" : null,
+      visibleSize ? "usable target size" : null,
+      hrefIntent ? "conversion href" : null,
+      vaguePenalty ? "vague text penalty" : null
+    ].filter((item): item is string => Boolean(item)).join(", ") || "visible link/button";
+    return { ...cta, score, reason };
+  }).sort((a, b) => b.score - a.score);
+}
+
+function copyMetricsFor(headline: string, ctaText: string | null, issues: string[]): JsonObject {
+  const combined = `${headline} ${ctaText ?? ""}`.trim();
+  const wordCount = combined ? combined.split(/\s+/).filter(Boolean).length : 0;
+  const jargonCount = (combined.match(/\b(revolutionary|innovative|seamless|cutting-edge|world-class|synergy|platform)\b/gi) ?? []).length;
+  const passiveVoiceHints = (combined.match(/\b(is|are|was|were|be|been|being)\s+\w+ed\b/gi) ?? []).length;
+  return { wordCount, jargonCount, passiveVoiceHints, issueCount: issues.length };
 }
 
 function clarityScore(headline: string): 1 | 2 | 3 | 4 | 5 {
