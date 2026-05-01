@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ArtifactStore, BrowserSessionManager, CheckpointStore, ConfigManager, DeployManager, FakeProvider, GeminiProvider, LearningStore, MemoryStore, PermissionGate, ReviewDashboard, SafetyModeManager, SkillExecutor, SkillRegistry, StalenessDetector, StreamHandler, TasteProfileStore, ToolExecutor, ToolRegistry, sanitize, scanDomContent, type ToolHandler } from "@dstack/core";
-import type { ProjectMemory, SkillInvocation } from "@dstack/shared";
+import { estimateGeminiCostUsd, type ProjectMemory, type SkillInvocation } from "@dstack/shared";
 import { tempWorkspace } from "../helpers/temp-workspace.js";
 
 describe("ConfigManager", () => {
@@ -378,6 +378,11 @@ describe("Skill runtime", () => {
 });
 
 describe("Phase 2 modules", () => {
+  it("estimates Gemini benchmark cost from pricing constants", () => {
+    expect(estimateGeminiCostUsd("gemini-2.0-flash", 1_000, 500)).toBeCloseTo(0.0003, 8);
+    expect(estimateGeminiCostUsd("unknown-model", 1_000, 500)).toBeNull();
+  });
+
   it("detects stale artifacts when a dependency is re-run", async () => {
     const workspace = await tempWorkspace();
     try {
