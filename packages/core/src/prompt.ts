@@ -55,7 +55,7 @@ export async function loadDstackProjectContext(projectRoot: string, maxChars = 1
   const sanitized = sanitize(content);
   const secretsRedacted = sanitized !== content;
   
-  // Scan for prompt injection
+  // Scan for prompt injection on already sanitized content
   const injectionScan: BrowserDomScanResult = scanDomContent(sanitized);
   const promptInjectionDetected = injectionScan.detected;
   const promptInjectionFragments = promptInjectionDetected ? injectionScan.fragments : [];

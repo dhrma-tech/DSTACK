@@ -96,7 +96,7 @@ describe("PermissionGate", () => {
 
   it("requires approval for node -e commands", async () => {
     const gate = new PermissionGate({ interactive: false });
-    await expect(gate.check({ id: "node-e", name: "run_command", input: { command: 'node -e "console.log(1)"' } })).resolves.toBe("REQUIRE_APPROVAL");
+    await expect(gate.check({ id: "node-e", name: "run_command", input: { command: 'node -e "console.log(1)"' } })).rejects.toThrow("Tool call requires approval in non-interactive mode");
   });
 
   it("denies shell commands that read .env files", async () => {

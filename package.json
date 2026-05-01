@@ -11,7 +11,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "skill:check": "tsx scripts/validate-skill-manifests.ts",
-    "ds": "tsx --conditions development packages/cli/src/index.ts"
+    "ds": "tsx --conditions development packages/cli/src/index.ts",
+    "backend:smoke": "node scripts/backend-smoke.mjs"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

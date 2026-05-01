@@ -10,7 +10,7 @@ import { PermissionGate } from "./permissions.js";
 import { atomicWrite, ensureDir, exists, fileSafeTimestamp, git, resolveInsideRoot } from "./utils.js";
 import { scanDomContent } from "./browser/dom-scanner.js";
 import { BrowserSessionManager } from "./browser/session-manager.js";
-import { BrowserRefMapManager, type BrowserSnapshotRefMap } from "./browser/ref-map.js";
+import { BrowserRefMapManager,  } from "./browser/ref-map.js";
 import { generateBrowserSnapshot } from "./browser/snapshot.js";
 
 const execAsync = promisify(exec);
@@ -202,7 +202,7 @@ function browserTools(): ToolHandler[] {
   const p = await open(contextArg, sessionName); 
   const refMap = await generateBrowserSnapshot(p, sessionName);
   refMapManager.setRefMap(sessionName, refMap);
-  return refMap; 
+  return refMap as JsonObject; 
 }),
     tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath, session: activeSession }; }),
     tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { 
@@ -221,7 +221,11 @@ function browserTools(): ToolHandler[] {
     return { success: true, elementFound: true, session: activeSession };
   }
   
-  // Use resolved ref
+  // Use resolved ref - ensure it's clickable
+  if (!resolvedRef.clickable) {
+    throw new ToolError(`Ref ${ref} (${resolvedRef.role}) is not a clickable element`);
+  }
+  
   let element;
   if (resolvedRef.source === "testid") {
     element = p.locator(resolvedRef.selectorHint);
@@ -253,9 +257,9 @@ function browserTools(): ToolHandler[] {
     return { success: true, session: activeSession };
   }
   
-  // Use resolved ref - ensure it's a text input element
-  if (!resolvedRef.role.includes("textbox") && !resolvedRef.role.includes("input") && !resolvedRef.role.includes("textarea")) {
-    throw new ToolError(`Ref ${ref} (${resolvedRef.role}) is not a text input element`);
+  // Use resolved ref - ensure it's fillable
+  if (!resolvedRef.fillable) {
+    throw new ToolError(`Ref ${ref} (${resolvedRef.role}) is not a fillable element`);
   }
   
   let element;

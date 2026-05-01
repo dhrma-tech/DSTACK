@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { ArtifactStore } from "@dstack/core";
+import { ArtifactStore } from "../../packages/core/src/memory.js";
 import { parseArgv } from "../../packages/cli/src/parser.js";
 import { route } from "../../packages/cli/src/router.js";
 import { tempWorkspace } from "../helpers/temp-workspace.js";
@@ -89,8 +89,11 @@ describe("CLI", () => {
       expect(concise.stdout).not.toContain("projectName");
 
       const verbose = await route(await parseArgv(["/office-hours", "--provider", "fake", "--json", "--idea", "Verbose output"], workspace.root));
-      expect(verbose.stdout).toContain("Artifact JSON:");
-      expect(verbose.stdout).toContain("projectName");
+      const verboseParsed = JSON.parse(verbose.stdout);
+      expect(verboseParsed.ok).toBe(true);
+      expect(verboseParsed.data).toHaveProperty("skillName", "office-hours");
+      expect(verboseParsed.data).toHaveProperty("output");
+      expect(verboseParsed.data.output).toHaveProperty("projectName");
 
       const verboseFlag = await route(await parseArgv(["/office-hours", "--provider", "fake", "--verbose", "--idea", "Verbose flag output"], workspace.root));
       expect(verboseFlag.stdout).toContain("Artifact JSON:");

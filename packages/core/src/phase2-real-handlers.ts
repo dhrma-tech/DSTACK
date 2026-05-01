@@ -6,7 +6,7 @@
 // - skills/handlers/deploy.ts (setup-deploy, land-and-deploy, freeze, unfreeze, canary)
 // - skills/handlers/browser.ts (browse, scrape, setup-browser-cookies, pair-agent)
 // - skills/handlers/benchmark.ts (benchmark, benchmark-models)
-// - skills/handlers/memory.ts (setup-memory, learn, context-save, context-restore)
+// - skills/handlers/memory.ts (setup-memory, learn-save-restore)
 // - skills/handlers/safety.ts (guard, careful, health)
 // - skills/handlers/system.ts (skillify, dstack-upgrade, retro)
 // - skills/handlers/integrations.ts (codex, cso)
@@ -72,7 +72,7 @@ export const healthHandler = directPhase2Handler(runHealth);
 export const retroHandler: SkillHandler = {
   ...directPhase2Handler(runRetro),
   async postSave(output, context) {
-    await storeRetroLearnings(output, context);
+    await storeRetroLearnings(context, output);
   }
 };
 export const guardHandler = directPhase2Handler(runGuard);
@@ -502,7 +502,7 @@ async function runRetro(context: SkillExecutionContext): Promise<JsonObject> {
   return output;
 }
 
-async function storeRetroLearnings(output: JsonObject, context: SkillExecutionContext): Promise<void> {
+async function storeRetroLearnings(context: SkillExecutionContext, output: JsonObject): Promise<void> {
   if (!bool(output.learningSuggestionsStored)) return;
   const store = new LearningStore({ dstackDir: context.config.dstackDir });
   const existing = await store.all();
@@ -809,7 +809,9 @@ async function runCanary(context: SkillExecutionContext): Promise<JsonObject> {
     rollbackOutput = rollback.output;
   }
   const canaryVerdict = command.exitCode === 0 && failures === 0 ? "PROMOTE" : command.exitCode !== 0 || consecutiveFailures >= 3 ? "ROLLBACK" : "INCONCLUSIVE";
-  await manager.recordDeployRun({ id: shortHash(`${config.canaryCommand}:${deployedAt}`, 12), projectId: context.config.projectRoot, environment, type: "canary", startedAt: deployedAt, completedAt: nowIso(), deployCommand: config.canaryCommand, exitCode: commandExitCode, stdout: commandOutput, stderr: "", verdict: canaryVerdict === "PROMOTE" ? "PASS" : "FAIL", healthCheckVerdict: failures === 0 ? "PASS" : "FAIL", gitHead: (await git(["rev-parse", "--short", "HEAD"], context.config.projectRoot)).stdout.trim() || "unknown", gitBranch: (await git(["branch", "--show-current"], context.config.projectRoot)).stdout.trim() || "unknown", deployedBy: "dstack", rollbackExecuted, frozen: false });
+  const gitHeadResult = await git(["rev-parse", "--short", "HEAD"], context.config.projectRoot);
+  const gitBranchResult = await git(["branch", "--show-current"], context.config.projectRoot);
+  await manager.recordDeployRun({ id: shortHash(`${config.canaryCommand}:${deployedAt}`, 12), projectId: context.config.projectRoot, environment, type: "canary", startedAt: deployedAt, completedAt: nowIso(), deployCommand: config.canaryCommand, exitCode: commandExitCode, stdout: commandOutput, stderr: "", verdict: canaryVerdict === "PROMOTE" ? "PASS" : "FAIL", healthCheckVerdict: failures === 0 ? "PASS" : "FAIL", gitHead: gitHeadResult.stdout.trim() || "unknown", gitBranch: gitBranchResult.stdout.trim() || "unknown", deployedBy: "dstack", rollbackExecuted, frozen: false });
   return mark(context, {
     environment,
     canaryPercent,
@@ -1123,16 +1125,16 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
     rateLimitMs,
     robotsChecks,
     warnings: skipped.length === urls.length ? ["No URLs were scraped; all requested URLs were blocked or invalid.", ...warnings] : warnings
-  });
+  } satisfies JsonObject);
 }
 
-async function scrapeUrlStructured(context: SkillExecutionContext, url: string, robotsResult: any, fields: string[]): Promise<JsonObject> {
+async function scrapeUrlStructured(context: SkillExecutionContext, url: string, robotsResult: { allowed: boolean; robotsStatus: "found" | "missing" | "error"; matchedRule?: string; reason?: string; [key: string]: unknown }, fields: string[]): Promise<JsonObject> {
   const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(url);
   const extractor = new StructuredExtractor();
   
   if (local) {
     try {
-      await context.toolExecutor.dispatch({ id: `open-${shortHash(url)}`, name: "browser_open", input: { url, session: str(context.invocation.inputs.session, "default")! } });
+      await context.toolExecutor.dispatch({ id: `open-${shortHash(url)}`, name: "browser_open", input: { url: str(context.invocation.inputs.session, "default")! } });
       const snapshot = await context.toolExecutor.dispatch({ id: `snapshot-${shortHash(url)}`, name: "browser_snapshot", input: { session: str(context.invocation.inputs.session, "default")! } });
       const screenshot = await context.toolExecutor.dispatch({ id: `screenshot-${shortHash(url)}`, name: "browser_screenshot", input: { label: "scrape", session: str(context.invocation.inputs.session, "default")! } });
       
@@ -1144,8 +1146,9 @@ async function scrapeUrlStructured(context: SkillExecutionContext, url: string, 
           ...structuredResult,
           fields: extractCustomFields(structuredResult.mainText, fields),
           screenshotPath: str(screenshot.output.path, "")!,
-          scrapedAt: nowIso()
-        };
+          scrapedAt: nowIso(),
+          robots: robotsResult as JsonObject
+        } satisfies JsonObject;
       }
       
       // Fallback to old method if page unavailable
@@ -1164,7 +1167,8 @@ async function scrapeUrlStructured(context: SkillExecutionContext, url: string, 
 }
 
 // Helper function to get browser page for structured extraction
-async function getBrowserPage(context: SkillExecutionContext, session: string): Promise<any> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function getBrowserPage(context: SkillExecutionContext, session: string): Promise<null> {
   // This would need to be implemented to get the actual Playwright page
   // For now, return null to fallback to old method
   return null;
@@ -1840,38 +1844,6 @@ function isSensitiveUrl(url: URL): boolean {
   return /\/(checkout|payment|billing|admin)(\/|$)/i.test(url.pathname);
 }
 
-interface RobotsDecision {
-  allowed: boolean;
-  rule: string;
-  warning: string | null;
-}
-
-async function readRobots(url: URL): Promise<RobotsDecision> {
-  const robotsUrl = new URL("/robots.txt", url.origin);
-  try {
-    const response = await fetch(robotsUrl);
-    if (!response.ok) return { allowed: true, rule: "robots.txt unavailable", warning: `robots.txt returned ${response.status} for ${url.origin}; scrape proceeded cautiously.` };
-    const body = await response.text();
-    const rule = disallowRuleFor(body, url.pathname);
-    return rule ? { allowed: false, rule, warning: null } : { allowed: true, rule: "", warning: null };
-  } catch (error) {
-    return { allowed: true, rule: "robots.txt fetch failed", warning: `robots.txt fetch failed for ${url.origin}: ${error instanceof Error ? error.message : String(error)}` };
-  }
-}
-
-function disallowRuleFor(robots: string, pathname: string): string | null {
-  let applies = false;
-  for (const rawLine of robots.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*/, "").trim();
-    if (!line) continue;
-    const [fieldRaw, ...valueParts] = line.split(":");
-    const field = fieldRaw?.trim().toLowerCase();
-    const value = valueParts.join(":").trim();
-    if (field === "user-agent") applies = value === "*";
-    if (applies && field === "disallow" && value && pathname.startsWith(value)) return value;
-  }
-  return null;
-}
 
 async function waitForScrapeRateLimit(origin: string, lastRequestByOrigin: Map<string, number>, minimumDelayMs: number): Promise<void> {
   const now = Date.now();

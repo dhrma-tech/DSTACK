@@ -7,9 +7,16 @@ export interface ParsedCommand {
   version: boolean;
   listSkills: boolean;
   skillCheck: boolean;
+  serve: boolean;
   json: boolean;
   verbose: boolean;
   invocation: SkillInvocation | null;
+  serveOptions?: {
+    host?: string;
+    port?: number;
+    tokenFile?: string;
+    allowAbsolutePaths?: boolean;
+  };
 }
 
 export async function parseArgv(argv = hideBin(process.argv), projectRoot = process.cwd()): Promise<ParsedCommand> {
@@ -21,6 +28,11 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("version", { type: "boolean" })
     .option("list-skills", { type: "boolean" })
     .option("skill-check", { type: "boolean" })
+    .option("serve", { type: "boolean" })
+    .option("host", { type: "string" })
+    .option("port", { type: "number" })
+    .option("token-file", { type: "string" })
+    .option("allow-absolute-paths", { type: "boolean" })
     .option("force", { type: "boolean", default: false })
     .option("dry-run", { type: "boolean", default: false })
     .option("no-stream", { type: "boolean", default: false })
@@ -31,16 +43,17 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("allow-secrets", { type: "boolean", default: false })
     .parse();
   const skillName = parsed._.map(String)[0] ?? null;
-  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
+  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "serve", "host", "port", "token-file", "allow-absolute-paths", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
   const inputs: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!reserved.has(key) && isJsonValue(value)) inputs[key] = value;
   }
   return {
-    help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed["skill-check"] !== true && parsed.version !== true),
+    help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed["skill-check"] !== true && parsed.serve !== true && parsed.version !== true),
     version: parsed.version === true,
     listSkills: parsed["list-skills"] === true,
     skillCheck: parsed["skill-check"] === true,
+    serve: parsed.serve === true,
     json: parsed.json === true,
     verbose: parsed.verbose === true,
     invocation: skillName
@@ -57,7 +70,24 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
           },
           projectRoot
         }
-      : null
+      : null,
+    ...(parsed.serve ? {
+      serveOptions: (() => {
+        const options: {
+          host?: string;
+          port?: number;
+          tokenFile?: string;
+          allowAbsolutePaths?: boolean;
+        } = {};
+        
+        if (parsed.host !== undefined) options.host = parsed.host;
+        if (parsed.port !== undefined) options.port = parsed.port;
+        if (parsed["token-file"] !== undefined) options.tokenFile = parsed["token-file"];
+        if (parsed["allow-absolute-paths"] !== undefined) options.allowAbsolutePaths = parsed["allow-absolute-paths"];
+        
+        return options;
+      })()
+    } : {})
   };
 }
 

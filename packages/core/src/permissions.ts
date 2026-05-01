@@ -16,7 +16,16 @@ const destructive = [
   /\bdd\s+if=/i,
   /\bmkfs\b/i,
   /\bxargs\b/i,
-  /\b(bash|sh)\s+-c\b/i
+  /\b(bash|sh)\s+-c\b/i,
+  // Additional shell composition patterns
+  /\|\s*(bash|sh|zsh|fish)\b/i,
+  /;\s*(rm|dd|mkfs|sudo)\b/i,
+  /\$\([^)]*\)\s*(rm|dd|mkfs|sudo)\b/i,
+  /`[^`]*`\s*(rm|dd|mkfs|sudo)\b/i,
+  /\b(curl|wget)\s+.*\s*\|\s*(bash|sh|zsh|fish)\b/i,
+    /\bnpm\s+exec\b/i,
+  /\byarn\s+exec\b/i,
+  /\bpnpm\s+exec\b/i
 ];
 const approved = [/^npm\s+run\b/i, /^yarn\b/i, /^pnpm\b/i, /^npx\s+(vitest|jest|tsc)\b/i, /^git\s+(status|diff|log)\b/i, /^(ls|dir|echo)\b/i];
 
@@ -49,9 +58,19 @@ function decisionFor(toolCall: ToolCall): PermissionDecision {
   if (toolCall.name === "run_command") {
     const command = String(toolCall.input.command ?? "");
     if (destructive.some((pattern) => pattern.test(command))) return "DENY";
-    // Deny reading .env files via shell commands
+    // Deny reading .env files via shell commands with path traversal variants
     if (/\b(cat|type)\s+.*\.env(\..*)?(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\.env\.local(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\.env\.example(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\.env\.development(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\.env\.production(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\.env\.test(\s|$)/i.test(command)) return "DENY";
+    // Path traversal variants
+    if (/\b(cat|type)\s+.*\.\.\/.*\.env(\..*)?(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\/config\/.*\.env(\..*)?(\s|$)/i.test(command)) return "DENY";
+    if (/\b(cat|type)\s+.*\/etc\/.*\.env(\..*)?(\s|$)/i.test(command)) return "DENY";
     if (/\bgit\s+(push|rebase|merge|tag)\b/i.test(command)) return "REQUIRE_APPROVAL";
+    if (/\bnode\s+-e\b/i.test(command)) return "REQUIRE_APPROVAL";
     if (approved.some((pattern) => pattern.test(command.trim()))) return "ALLOW";
     return "REQUIRE_APPROVAL";
   }

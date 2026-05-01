@@ -9,7 +9,8 @@ const explicitInstructionPatterns = [
   /\[(SYSTEM|INST|INSTRUCTION)\][\s\S]{0,800}/gi,
   /ignore\s+(all\s+)?previous\s+instructions[\s\S]{0,400}/gi,
   /you\s+are\s+now[\s\S]{0,400}/gi,
-  /your\s+new\s+instructions\s+are[\s\S]{0,400}/gi
+  /your\s+new\s+instructions\s+are[\s\S]{0,400}/gi,
+  /<\s*INST\s*>/gi
 ];
 
 const longBase64Pattern = /\b[A-Za-z0-9+/]{200,}={0,2}\b/g;

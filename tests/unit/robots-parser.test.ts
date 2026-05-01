@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { RobotsParser } from "@dstack/core";
 
 // Mock fetch for testing
@@ -13,7 +13,7 @@ describe("RobotsParser", () => {
   });
 
   it("allows URLs when robots.txt is missing", async () => {
-    (fetch as any).mockRejectedValueOnce({ message: "404" });
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce({ message: "404" });
     
     const result = await parser.checkUrl("https://example.com/page");
     
@@ -27,7 +27,7 @@ describe("RobotsParser", () => {
 Allow: /page
 Disallow: /private`;
     
-    (fetch as any).mockResolvedValueOnce({
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       text: () => Promise.resolve(mockRobots)
     });
@@ -43,7 +43,7 @@ Disallow: /private`;
     const mockRobots = `User-agent: *
 Disallow: /private`;
     
-    (fetch as any).mockResolvedValueOnce({
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       text: () => Promise.resolve(mockRobots)
     });
@@ -59,7 +59,7 @@ Disallow: /private`;
     const mockRobots = `User-agent: *
 Disallow: /*/admin`;
     
-    (fetch as any).mockResolvedValueOnce({
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       text: () => Promise.resolve(mockRobots)
     });
@@ -74,7 +74,7 @@ Disallow: /*/admin`;
     const mockRobots = `User-agent: *
 Disallow: /private`;
     
-    (fetch as any).mockResolvedValueOnce({
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       text: () => Promise.resolve(mockRobots)
     });
@@ -87,7 +87,7 @@ Disallow: /private`;
   });
 
   it("handles fetch errors gracefully", async () => {
-    (fetch as any).mockRejectedValueOnce(new Error("Network error"));
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Network error"));
     
     const result = await parser.checkUrl("https://example.com/page");
     
@@ -100,7 +100,7 @@ Disallow: /private`;
     const mockRobots = `User-agent: *
 Disallow: /private`;
     
-    (fetch as any).mockResolvedValue({
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(mockRobots)
     });
@@ -111,5 +111,87 @@ Disallow: /private`;
     
     // Should fetch twice since cache was cleared
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  // New comprehensive tests for longest-match precedence and edge cases
+  it("Disallow /private blocks /private/page", async () => {
+    const mockRobots = `User-agent: *
+Disallow: /private`;
+    
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve(mockRobots)
+    });
+    
+    const result = await parser.checkUrl("https://example.com/private/page");
+    
+    expect(result.allowed).toBe(false);
+    expect(result.matchedRule).toBe("Disallow: /private");
+  });
+
+  it("Allow /private/public beats Disallow /private", async () => {
+    const mockRobots = `User-agent: *
+Disallow: /private
+Allow: /private/public`;
+    
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve(mockRobots)
+    });
+    
+    const result = await parser.checkUrl("https://example.com/private/public");
+    
+    expect(result.allowed).toBe(true);
+    expect(result.matchedRule).toBe("Allow: /private/public");
+  });
+
+  it("Missing robots allows with robotsStatus=missing", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce({ message: "404" });
+    
+    const result = await parser.checkUrl("https://example.com/page");
+    
+    expect(result.allowed).toBe(true);
+    expect(result.robotsStatus).toBe("missing");
+    expect(result.reason).toBe("robots.txt not found");
+  });
+
+  it("wildcard and $ anchor behavior", async () => {
+    const mockRobots = `User-agent: *
+Disallow: /admin/*
+Allow: /admin/public$`;
+    
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve(mockRobots)
+    });
+    
+    const disallowedResult = await parser.checkUrl("https://example.com/admin/secret");
+    const allowedResult = await parser.checkUrl("https://example.com/admin/public");
+    
+    expect(disallowedResult.allowed).toBe(false);
+    expect(disallowedResult.matchedRule).toBe("Disallow: /admin/*");
+    
+    expect(allowedResult.allowed).toBe(true);
+    expect(allowedResult.matchedRule).toBe("Allow: /admin/public$");
+  });
+
+  it("properly escapes regex metacharacters", async () => {
+    const mockRobots = `User-agent: *
+Disallow: /path+with+plus
+Disallow: /path?with?question
+Disallow: /path$with$dollar`;
+    
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve(mockRobots)
+    });
+    
+    const result1 = await parser.checkUrl("https://example.com/path+with+plus");
+    const result2 = await parser.checkUrl("https://example.com/path?with?question");
+    const result3 = await parser.checkUrl("https://example.com/path$with$dollar");
+    
+    expect(result1.allowed).toBe(false);
+    expect(result2.allowed).toBe(false);
+    expect(result3.allowed).toBe(false);
   });
 });

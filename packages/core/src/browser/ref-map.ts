@@ -5,19 +5,33 @@ export interface BrowserElementRef {
   selectorHint: string;
   source: "role" | "testid" | "text" | "css";
   visible: boolean;
+  clickable: boolean;
+  fillable: boolean;
+  tagName: string;
+  attributes: Record<string, string>;
+  order: number;
+  stale?: boolean;
 }
 
 export interface BrowserSnapshotRefMap {
+  id: string;
+  projectId: string;
+  session: string;
+  createdAt: string;
   url: string;
   title: string;
   text: string;
   ariaTree: string;
   interactiveRefs: BrowserElementRef[];
-  timestamp: string;
   promptInjectionDetected: boolean;
   promptInjectionFragments: string[];
-  session: string;
-  [key: string]: any; // Make it indexable to satisfy JsonObject
+  scannerSummary: {
+    detected: boolean;
+    fragmentCount: number;
+  };
+  consoleLogsCount: number;
+  networkLogsCount: number;
+  [key: string]: unknown; // Make it indexable to satisfy JsonObject
 }
 
 export class BrowserRefMapManager {

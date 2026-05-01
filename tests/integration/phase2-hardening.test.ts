@@ -220,7 +220,7 @@ describe("Phase 2 hardening pass", () => {
       const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
       const result = await executor.run(invocation("/scrape", workspace.root, { url }));
       expect(result.output?.scrapedUrls).toEqual([]);
-      expect(JSON.stringify(result.output?.skippedUrls)).toContain("Blocked by robots.txt");
+      expect(JSON.stringify(result.output?.skippedUrls)).toContain("Path matches disallow rule");
       expect(result.output?.robotsRespected).toBe(true);
       expect(result.output?.robotsChecks).toBe(1);
       expect(result.output?.rateLimitMs).toBe(1000);
