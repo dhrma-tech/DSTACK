@@ -313,10 +313,13 @@ describe("Phase 2 hardening pass", () => {
       expect(result.output?.dstackMdWritten).toBe(true);
       expect(result.output?.promptInjectionReady).toBe(true);
       expect(result.output?.addedDecisions).toBe(1);
+      expect(result.output?.importedLearningEntries).toBe(1);
       const body = await readFile(path.join(workspace.root, "DSTACK.md"), "utf8");
       expect(body).toContain("Keep this hand-written section.");
       expect(body).toContain("<!-- DSTACK:BEGIN -->");
       expect(body).toContain("Fake mode keeps CI deterministic.");
+      const importedLearnings = await new LearningStore({ dstackDir: config.dstackDir }).search("testing");
+      expect(importedLearnings[0]?.source).toBe("setup-memory");
     } finally {
       await workspace.cleanup();
     }

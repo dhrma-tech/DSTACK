@@ -563,10 +563,13 @@ async function runSetupMemory(context: SkillExecutionContext): Promise<JsonObjec
   let memory = previous ?? defaultMemory(now);
   let addedDecisions = 0;
   let addedDomainTerms = 0;
+  let importedLearningEntries = 0;
   if (!previous) updatedFields.push("memory");
   if (importedFromRetro) {
     const retro = await context.artifactStore.readLatest("retro");
     if (!retro) throw new ArtifactError("/setup-memory --import-retro requires a /retro artifact.");
+    const learningStore = new LearningStore({ dstackDir: context.config.dstackDir });
+    const existingLearnings = await learningStore.all();
     for (const decision of objectArray(retro.content.keyDecisions)) {
       const text = str(decision.decision, null);
       if (text && !memory.keyDecisions.some((item) => item.decision === text)) {
@@ -581,9 +584,22 @@ async function runSetupMemory(context: SkillExecutionContext): Promise<JsonObjec
         memory = { ...memory, domainTerms: { ...memory.domainTerms, [topic]: insight } };
         addedDomainTerms += 1;
       }
+      if (topic && insight && !hasDuplicateLearning(existingLearnings, topic, insight)) {
+        const stored = await learningStore.add({
+          topic,
+          insight,
+          originalText: insight,
+          wasRephrased: false,
+          appliesTo: stringArray(entry.appliesTo),
+          source: "setup-memory"
+        });
+        existingLearnings.push(stored);
+        importedLearningEntries += 1;
+      }
     }
     if (addedDecisions > 0) updatedFields.push("keyDecisions");
     if (addedDomainTerms > 0) updatedFields.push("domainTerms");
+    if (importedLearningEntries > 0) updatedFields.push("learnings");
   }
   memory = { ...memory, updatedAt: now };
   await context.memoryStore.write(memory);
@@ -598,6 +614,7 @@ async function runSetupMemory(context: SkillExecutionContext): Promise<JsonObjec
     updatedFields: unique(updatedFields),
     addedDecisions,
     addedDomainTerms,
+    importedLearningEntries,
     importedFromRetro,
     dstackMdWritten,
     memoryFilePath: context.memoryStore.memoryPath,

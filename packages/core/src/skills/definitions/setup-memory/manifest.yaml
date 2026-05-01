@@ -13,6 +13,7 @@ outputSchema:
     updatedFields: { type: array }
     addedDecisions: { type: number }
     addedDomainTerms: { type: number }
+    importedLearningEntries: { type: number }
     importedFromRetro: { type: boolean }
     dstackMdWritten: { type: boolean }
     memoryFilePath: { type: string }
