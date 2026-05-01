@@ -5,13 +5,15 @@ model: none
 streaming: false
 requiresArtifacts: []
 allowedTools: ["read_file"]
-inputs: [{ name: reason, type: string, required: false, description: Optional reason }]
+inputs:
+  - { name: reason, type: string, required: false, description: Optional reason }
+  - { name: off, type: boolean, required: false, description: Return safety mode to NORMAL }
 outputSchema:
   type: object
   required: ["previousMode", "newMode", "activatedAt", "gatedOperations", "deactivationCommand"]
   properties:
     previousMode: { type: string }
-    newMode: { type: string, enum: ["CAREFUL"] }
+    newMode: { type: string, enum: ["CAREFUL", "NORMAL"] }
     activatedAt: { type: string }
     gatedOperations: { type: array }
     deactivationCommand: { type: string }

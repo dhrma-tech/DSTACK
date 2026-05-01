@@ -459,6 +459,21 @@ async function runGuard(context: SkillExecutionContext): Promise<JsonObject> {
 async function runCareful(context: SkillExecutionContext): Promise<JsonObject> {
   const manager = new SafetyModeManager({ dstackDir: context.config.dstackDir });
   const previous = await manager.read();
+  if (bool(context.invocation.inputs.off)) {
+    const next = await manager.reset();
+    return mark(context, {
+      previousMode: previous.mode,
+      newMode: "NORMAL",
+      activatedAt: nowIso(),
+      gatedOperations: next.gatedOperations,
+      deactivationCommand: "",
+      riskList: [],
+      unsafeOperations: [],
+      recommendedChecks: ["Safety mode returned to NORMAL."],
+      checked: ["safety mode"],
+      skipped: ["risk preflight skipped because --off was requested"]
+    });
+  }
   const next = await manager.setMode("CAREFUL", "careful", str(context.invocation.inputs.reason, null));
   const dashboard = await new ReviewDashboard({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).compute();
   const deployState = await new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).readState();

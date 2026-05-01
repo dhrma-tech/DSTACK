@@ -100,4 +100,25 @@ describe("CLI", () => {
       await workspace.cleanup();
     }
   });
+
+  it("prints active safety and deploy freeze status with skill results", async () => {
+    const workspace = await tempWorkspace();
+    vi.stubEnv("GEMINI_API_KEY", "");
+    try {
+      const guarded = await route(await parseArgv(["/guard", "--provider", "fake", "--reason", "audit window"], workspace.root));
+      expect(guarded.exitCode).toBe(0);
+      expect(guarded.stdout).toContain("Safety mode: GUARD");
+
+      const carefulOff = await route(await parseArgv(["/careful", "--provider", "fake", "--off"], workspace.root));
+      expect(carefulOff.exitCode).toBe(0);
+      expect(carefulOff.stdout).not.toContain("Safety mode: GUARD");
+
+      const frozen = await route(await parseArgv(["/freeze", "--provider", "fake", "--reason", "release hold"], workspace.root));
+      expect(frozen.exitCode).toBe(0);
+      expect(frozen.stdout).toContain("Deploy status: DEPLOY FROZEN (release hold)");
+    } finally {
+      vi.unstubAllEnvs();
+      await workspace.cleanup();
+    }
+  });
 });

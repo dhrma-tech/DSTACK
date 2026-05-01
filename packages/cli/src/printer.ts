@@ -2,6 +2,12 @@ import chalk from "chalk";
 import type { ProviderName, SkillManifest, SkillRunResult } from "@dstack/shared";
 import type { SkillAuditReport } from "@dstack/core";
 
+export interface RuntimeStatus {
+  safetyMode: string;
+  deployFrozen: boolean;
+  deployFreezeReason: string | null;
+}
+
 export function helpText(): string {
   return [
     "DStack CLI",
@@ -39,11 +45,14 @@ export function skillCheckText(report: SkillAuditReport): string {
     ...(report.warnings.length > 0 ? ["Warnings:", ...report.warnings.map((issue) => `- /${issue.skillName} [${issue.check}] ${issue.message}`)] : [])
   ].join("\n");
 }
-export function resultText(result: SkillRunResult, options: { provider: ProviderName; includeOutput: boolean }): string {
+export function resultText(result: SkillRunResult, options: { provider: ProviderName; includeOutput: boolean; runtimeStatus?: RuntimeStatus }): string {
+  const status = options.runtimeStatus;
   const lines = [
     `${chalk.green("Completed")} /${result.skillName}`,
     `Status: ${result.status}`,
     `Provider: ${options.provider}`,
+    ...(status && status.safetyMode !== "NORMAL" ? [`Safety mode: ${status.safetyMode}`] : []),
+    ...(status?.deployFrozen ? [`Deploy status: DEPLOY FROZEN${status.deployFreezeReason ? ` (${status.deployFreezeReason})` : ""}`] : []),
     ...(result.verdict ? [`Verdict: ${result.verdict}`] : []),
     `Artifact: ${result.artifactPath ?? "not written"}`,
     `Next: ${result.nextSkill ? `ds /${result.nextSkill}` : "none"}`

@@ -232,6 +232,10 @@ describe("Phase 2 hardening pass", () => {
       expect(JSON.stringify(careful.output?.recommendedChecks)).toContain("/health");
       expect((await new SafetyModeManager({ dstackDir: config.dstackDir }).read()).mode).toBe("CAREFUL");
 
+      const carefulOff = await executor.run(invocation("/careful", workspace.root, { off: true }));
+      expect(carefulOff.output?.newMode).toBe("NORMAL");
+      expect((await new SafetyModeManager({ dstackDir: config.dstackDir }).read()).mode).toBe("NORMAL");
+
       const freeze = await executor.run(invocation("/freeze", workspace.root, { reason: "release hold", path: "packages/core" }));
       expect(freeze.output?.frozen).toBe(true);
       expect(freeze.output?.pathScope).toBe("packages/core");
