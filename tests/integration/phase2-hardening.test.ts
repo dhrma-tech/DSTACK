@@ -167,18 +167,50 @@ describe("Phase 2 hardening pass", () => {
       const setup = await executor.run(invocation("/setup-deploy", workspace.root, { command: "echo deploy-ready", dryRunCommand: "echo dry-run-ready" }));
       expect(setup.output?.dryRunResult).toBe("PASS");
       expect(String(setup.output?.dryRunOutput)).toContain("dry-run-ready");
+      expect(String(setup.output?.dryRunApprovalPrompt)).toContain("echo dry-run-ready");
 
       const staging = await executor.run(invocation("/land-and-deploy", workspace.root, { env: "staging" }));
       expect(staging.output?.deployVerdict).toBe("PASS");
       expect(String(staging.output?.deployOutput)).toContain("deploy-ready");
+      expect(staging.output?.approvalRequired).toBe(false);
 
       const production = await executor.run(invocation("/land-and-deploy", workspace.root, { env: "production" }));
       expect(production.output?.deployVerdict).toBe("FAIL");
       expect(String(production.output?.blockers)).toContain("Production deploy requires explicit approval");
+      expect(production.output?.approvalRequired).toBe(true);
+      expect(production.output?.approvalGranted).toBe(false);
+      expect(String(production.output?.approvalPrompt)).toContain("echo deploy-ready");
     } finally {
       await workspace.cleanup();
     }
   });
+
+  it("land-and-deploy retries transient health failures before passing", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const healthUrl = await startFlakyHealthServer([503, 503, 200]);
+      const config = await ConfigManager.load({ projectRoot: workspace.root });
+      const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
+      const artifacts = new ArtifactStore(config.dstackDir);
+      await artifacts.write("qa", qaOutput("PASS"));
+      await artifacts.write("ship", shipOutput(true));
+      await executor.run(invocation("/setup-deploy", workspace.root, {
+        command: "echo deploy-ready",
+        dryRunCommand: "echo dry-run-ready",
+        healthCheckUrl: healthUrl,
+        healthCheckIntervalSeconds: 1,
+        healthCheckTimeoutSeconds: 5
+      }));
+
+      const deployed = await executor.run(invocation("/land-and-deploy", workspace.root, { env: "staging" }));
+      expect(deployed.output?.deployVerdict).toBe("PASS");
+      expect(deployed.output?.healthCheckVerdict).toBe("PASS");
+      expect(deployed.output?.healthCheckAttempts).toBe(3);
+      expect(deployed.output?.rollbackRequired).toBe(false);
+    } finally {
+      await workspace.cleanup();
+    }
+  }, 10000);
 
   it("scrape respects robots.txt and records blocked status", async () => {
     const workspace = await tempWorkspace();
@@ -647,4 +679,17 @@ async function startLandingServer(): Promise<string> {
   await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
   const address = server.address() as AddressInfo;
   return `http://127.0.0.1:${address.port}/`;
+}
+
+async function startFlakyHealthServer(statuses: number[]): Promise<string> {
+  let index = 0;
+  server = createServer((_request, response) => {
+    const status = statuses[Math.min(index, statuses.length - 1)] ?? 200;
+    index += 1;
+    response.writeHead(status, { "content-type": "text/plain" });
+    response.end(status === 200 ? "ok" : "not ready");
+  });
+  await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo;
+  return `http://127.0.0.1:${address.port}/health`;
 }

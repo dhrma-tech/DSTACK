@@ -5,7 +5,10 @@ model: gemini-2.0-flash-001
 streaming: true
 requiresArtifacts: ["ship", "setup-deploy"]
 allowedTools: ["read_file", "run_command", "git_status", "git_log"]
-inputs: [{ name: env, type: string, required: false, description: staging or production }]
+inputs:
+  - { name: env, type: string, required: false, description: staging or production }
+  - { name: confirm-production, type: boolean, required: false, description: Explicitly confirm production deployment after reviewing the command }
+  - { name: execute-rollback, type: boolean, required: false, description: Execute configured rollback command when health checks fail }
 outputSchema:
   type: object
   required: ["environment", "deployedAt", "deployCommand", "deployOutput", "exitCode", "deployVerdict", "healthCheckUrl", "healthCheckVerdict", "healthCheckAttempts", "rollbackRequired", "rollbackExecuted", "rollbackOutput", "gitHead", "gitBranch", "blockers"]
@@ -16,12 +19,16 @@ outputSchema:
     deployOutput: { type: string }
     exitCode: { type: number }
     deployVerdict: { type: string, enum: ["PASS", "FAIL"] }
+    approvalRequired: { type: boolean }
+    approvalGranted: { type: boolean }
+    approvalPrompt: {}
     healthCheckUrl: {}
     healthCheckVerdict: { type: string }
     healthCheckAttempts: { type: number }
     rollbackRequired: { type: boolean }
     rollbackExecuted: { type: boolean }
     rollbackOutput: {}
+    rollbackPrompt: {}
     gitHead: { type: string }
     gitBranch: { type: string }
     blockers: { type: array }

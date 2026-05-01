@@ -256,11 +256,13 @@ async function runSetupDeploy(context: SkillExecutionContext): Promise<JsonObjec
   };
   await manager.writeConfig(config);
   const dryRun = await executeCommand(context, dryRunCommand, 180_000);
+  const dryRunApprovalPrompt = `Dry-run command reviewed for deploy setup: ${dryRunCommand}`;
   return mark(context, {
     platform: config.platform,
     environment: config.environment,
     deployCommand: config.deployCommand,
     dryRunCommand: config.dryRunCommand,
+    dryRunApprovalPrompt,
     healthCheckUrl: config.healthCheckUrl,
     rollbackCommand: config.rollbackCommand,
     requiredEnvVars: config.requiredEnvVars,
@@ -284,7 +286,11 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
   const config = await manager.readConfig().catch(() => null);
   if (!config) blockers.push("Deploy config missing. Run /setup-deploy first.");
   const productionApproved = bool(context.invocation.inputs["confirm-production"]) || bool(context.invocation.inputs.confirmProduction);
-  if (env === "production" && !productionApproved) blockers.push("Production deploy requires explicit approval: re-run with --confirm-production after reviewing the command.");
+  const approvalRequired = env === "production";
+  const approvalPrompt = approvalRequired && config
+    ? `Production deploy requires explicit approval. Review exact command before confirming: ${config.deployCommand}; environment: ${env}; ship verdict: ${ship?.verdict ?? "missing"}.`
+    : null;
+  if (approvalRequired && !productionApproved) blockers.push(`${approvalPrompt ?? "Production deploy requires explicit approval."} Re-run with --confirm-production after review.`);
 
   let deployOutput = "";
   let exitCode = blockers.length === 0 ? 0 : 1;
@@ -297,7 +303,12 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
   const health = config?.healthCheckUrl && exitCode === 0 ? await pollHealth(config.healthCheckUrl, config.healthCheckTimeoutSeconds, config.healthCheckIntervalSeconds) : { verdict: "SKIPPED" as const, attempts: 0, output: "No health check URL configured." };
   const rollbackRequired = exitCode === 0 && (health.verdict === "FAIL" || health.verdict === "TIMEOUT");
   let rollbackExecuted = false;
-  let rollbackOutput: string | null = rollbackRequired ? "Rollback command available but not executed automatically." : null;
+  const rollbackPrompt = rollbackRequired && config?.rollbackCommand
+    ? `Rollback is recommended. Review exact rollback command before executing: ${config.rollbackCommand}`
+    : rollbackRequired
+      ? "Rollback is recommended, but no rollback command is configured."
+      : null;
+  let rollbackOutput: string | null = rollbackRequired ? rollbackPrompt : null;
   if (rollbackRequired && config?.rollbackCommand && bool(context.invocation.inputs["execute-rollback"])) {
     const rollback = await executeCommand(context, config.rollbackCommand, 180_000);
     rollbackExecuted = rollback.exitCode === 0;
@@ -315,6 +326,9 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
     deployOutput,
     exitCode,
     deployVerdict,
+    approvalRequired,
+    approvalGranted: !approvalRequired || productionApproved,
+    approvalPrompt,
     healthCheckUrl: config?.healthCheckUrl ?? null,
     healthCheckVerdict: health.verdict,
     healthCheckAttempts: health.attempts,
@@ -322,6 +336,7 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
     rollbackRequired,
     rollbackExecuted,
     rollbackOutput,
+    rollbackPrompt,
     gitHead: head.stdout.trim() || "unknown",
     gitBranch: branch.stdout.trim() || "unknown",
     blockers
@@ -1496,6 +1511,7 @@ async function pollHealth(url: string, timeoutSeconds: number, intervalSeconds: 
   const intervalMs = Math.max(1000, Math.min(intervalSeconds * 1000, 5000));
   let attempts = 0;
   let last = "";
+  let consecutiveFailures = 0;
   while (Date.now() <= deadline && attempts < 5) {
     attempts += 1;
     try {
@@ -1505,9 +1521,12 @@ async function pollHealth(url: string, timeoutSeconds: number, intervalSeconds: 
       clearTimeout(timeout);
       last = `${response.status} ${response.statusText}`;
       if (response.ok) return { verdict: "PASS", attempts, output: last };
-      if (response.status >= 500) return { verdict: "FAIL", attempts, output: last };
+      consecutiveFailures = response.status >= 500 ? consecutiveFailures + 1 : 0;
+      if (consecutiveFailures >= 3) return { verdict: "FAIL", attempts, output: `${last}; failed ${consecutiveFailures} consecutive health checks` };
     } catch (error) {
       last = error instanceof Error ? error.message : String(error);
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 3) return { verdict: "FAIL", attempts, output: `${last}; failed ${consecutiveFailures} consecutive health checks` };
     }
     if (Date.now() + intervalMs <= deadline) await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
