@@ -5,6 +5,7 @@ export * from "./model.js";
 export * from "./permissions.js";
 export * from "./prompt.js";
 export * from "./skills.js";
+export * from "./skills/audit.js";
 export * from "./tools.js";
 export * from "./benchmark/runner.js";
 export * from "./browser/landing-analyzer.js";

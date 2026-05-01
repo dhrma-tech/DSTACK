@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import type { ProviderName, SkillManifest, SkillRunResult } from "@dstack/shared";
+import type { SkillAuditReport } from "@dstack/core";
 
 export function helpText(): string {
   return [
@@ -24,15 +25,18 @@ export function helpText(): string {
 }
 export const versionText = (version: string): string => `ds ${version}`;
 export const skillsText = (skills: SkillManifest[]): string => skills.map((skill) => `${chalk.cyan(`/${skill.name}`)} ${skill.description}`).join("\n");
-export function skillCheckText(skills: SkillManifest[]): string {
-  const phase2 = skills.filter((skill) => ["health", "guard", "land-and-deploy", "design-shotgun", "benchmark", "skillify"].some((marker) => skill.name === marker || skill.name.includes(marker))).length;
+export function skillCheckText(report: SkillAuditReport): string {
   return [
     "DStack Skill Check",
-    `Total skills: ${skills.length}`,
-    `Phase 2 surface present: ${phase2 >= 6 ? "yes" : "partial"}`,
-    `Manifest validation: ${skills.length === 42 ? "42/42 loaded" : `${skills.length} loaded`}`,
+    `Total skills: ${report.totalSkills}`,
+    `Status: ${report.passed ? "PASS" : "FAIL"}`,
+    `Manifest validation: ${report.totalSkills}/42 loaded`,
+    `Errors: ${report.errors.length}`,
+    `Warnings: ${report.warnings.length}`,
+    `Phase 2 central shim skills: ${report.centralShimSkills.length > 0 ? report.centralShimSkills.map((skill) => `/${skill}`).join(", ") : "none"}`,
     "",
-    ...skills.map((skill) => `/${skill.name} - ${skill.description}`)
+    ...(report.errors.length > 0 ? ["Errors:", ...report.errors.map((issue) => `- /${issue.skillName} [${issue.check}] ${issue.message}`), ""] : []),
+    ...(report.warnings.length > 0 ? ["Warnings:", ...report.warnings.map((issue) => `- /${issue.skillName} [${issue.check}] ${issue.message}`)] : [])
   ].join("\n");
 }
 export function resultText(result: SkillRunResult, options: { provider: ProviderName; includeOutput: boolean }): string {

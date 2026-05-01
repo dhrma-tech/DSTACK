@@ -17,6 +17,8 @@ outputSchema:
     environment: { type: string }
     deployCommand: { type: string }
     dryRunCommand: { type: string }
+    healthCheckUrl: {}
+    rollbackCommand: {}
     requiredEnvVars: { type: array }
     deployConfigPath: { type: string }
     dryRunResult: { type: string }

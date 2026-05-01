@@ -7,7 +7,7 @@ import { Logger } from "./logger.js";
 import { ArtifactStore, CheckpointStore, MemoryStore } from "./memory.js";
 import { LearningStore } from "./memory/learning-store.js";
 import { FakeProvider, ModelRouter, StreamHandler } from "./model.js";
-import { PromptTemplateEngine, repoContext } from "./prompt.js";
+import { loadDstackProjectContext, PromptTemplateEngine, repoContext } from "./prompt.js";
 import { StalenessDetector } from "./review/staleness.js";
 import { ToolExecutor, ToolRegistry } from "./tools.js";
 
@@ -108,7 +108,7 @@ export class SkillExecutor {
         const rendered = await new PromptTemplateEngine().render({
           manifest,
           promptFilePath: path.join(this.registry.definitionDirFor(manifest.name), manifest.systemPromptFile),
-          context: { userInputs: { ...invocation.inputs, ...builtContext }, projectMemory: await this.memory.read() as unknown as JsonObject | null, artifacts: prerequisiteArtifacts, repoState: await repoContext(invocation.projectRoot), toolResults, learnings: await relevantLearnings(this.options.config.dstackDir, manifest.name) },
+          context: { userInputs: { ...invocation.inputs, ...builtContext }, projectMemory: await this.memory.read() as unknown as JsonObject | null, artifacts: prerequisiteArtifacts, repoState: await repoContext(invocation.projectRoot), toolResults, learnings: await relevantLearnings(this.options.config.dstackDir, manifest.name), projectRouting: await loadDstackProjectContext(invocation.projectRoot) },
           tools: this.tools.definitions(manifest.allowedTools)
         });
         const response = await new StreamHandler().collect(provider.generate({ model, systemPrompt: rendered.systemPrompt, userMessage: rendered.userMessage, tools: rendered.tools, responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: this.options.config.maxTokens }));
@@ -189,13 +189,13 @@ async function relevantLearnings(dstackDir: string, skillName: string): Promise<
   return (await new LearningStore({ dstackDir }).list(skillName)).map((entry) => entry as unknown as JsonObject);
 }
 
-function validateOutputSchema(manifest: SkillManifest, output: JsonObject): void {
+export function validateOutputSchema(manifest: SkillManifest, output: JsonObject): void {
   const issues = validateJsonSchema(manifest.outputSchema, output, "$");
   if (issues.length > 0) {
     throw new ValidationError(`/${manifest.name} output failed schema validation`, { issues });
   }
 }
-function validateJsonSchema(schema: JsonObject, value: JsonValue, pathName: string): string[] {
+export function validateJsonSchema(schema: JsonObject, value: JsonValue, pathName: string): string[] {
   const issues: string[] = [];
   const expectedType = typeof schema.type === "string" ? schema.type : null;
   if (expectedType && !matchesType(expectedType, value)) {

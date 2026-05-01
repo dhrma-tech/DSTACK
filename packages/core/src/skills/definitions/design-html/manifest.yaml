@@ -13,6 +13,7 @@ outputSchema:
   required: ["screenName", "variantName", "htmlFilePath", "componentsCovered", "accessibilityNotes", "knownLimitations", "viewInstructions"]
   properties:
     screenName: { type: string }
+    variantName: {}
     htmlFilePath: { type: string }
     componentsCovered: { type: array }
     accessibilityNotes: { type: array }

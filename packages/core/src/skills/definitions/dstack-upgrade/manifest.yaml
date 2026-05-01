@@ -13,6 +13,9 @@ outputSchema:
     currentVersion: { type: string }
     latestVersion: { type: string }
     isUpToDate: { type: boolean }
+    upgradeApproved: { type: boolean }
+    upgradeExecuted: { type: boolean }
+    postUpgradeVerification: { type: string }
     changelogSummary: { type: string }
     breakingChanges: { type: array }
     requiredMigrations: { type: array }

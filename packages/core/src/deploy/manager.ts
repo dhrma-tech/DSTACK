@@ -16,6 +16,7 @@ export interface DeployFreezeState {
   reason: string | null;
   frozenUntil: string | null;
   pathScope: string | null;
+  actor: string | null;
 }
 
 export class DeployManager {
@@ -40,17 +41,17 @@ export class DeployManager {
     return parsed;
   }
 
-  async freeze(reason: string | null = null, frozenUntil: string | null = null, pathScope: string | null = null): Promise<DeployFreezeState> {
+  async freeze(reason: string | null = null, frozenUntil: string | null = null, pathScope: string | null = null, actor = "dstack"): Promise<DeployFreezeState> {
     const current = await this.readState();
     if (current.frozen) return current;
-    const state: DeployFreezeState = { frozen: true, frozenAt: nowIso(), reason, frozenUntil, pathScope };
+    const state: DeployFreezeState = { frozen: true, frozenAt: nowIso(), reason, frozenUntil, pathScope, actor };
     await atomicWrite(this.statePath, JSON.stringify(state, null, 2));
     return state;
   }
 
   async unfreeze(): Promise<DeployFreezeState> {
     const current = await this.readState();
-    const state: DeployFreezeState = { frozen: false, frozenAt: current.frozenAt, reason: current.reason, frozenUntil: current.frozenUntil, pathScope: current.pathScope };
+    const state: DeployFreezeState = { frozen: false, frozenAt: current.frozenAt, reason: current.reason, frozenUntil: current.frozenUntil, pathScope: current.pathScope, actor: current.actor };
     await atomicWrite(this.statePath, JSON.stringify(state, null, 2));
     return current;
   }
@@ -60,7 +61,7 @@ export class DeployManager {
   }
 
   async readState(): Promise<DeployFreezeState> {
-    if (!(await exists(this.statePath))) return { frozen: false, frozenAt: null, reason: null, frozenUntil: null, pathScope: null };
+    if (!(await exists(this.statePath))) return { frozen: false, frozenAt: null, reason: null, frozenUntil: null, pathScope: null, actor: null };
     const raw = await readJsonFile<unknown>(this.statePath);
     if (!isRecord(raw)) throw new ArtifactError("Deploy state is invalid");
     return {
@@ -68,7 +69,8 @@ export class DeployManager {
       frozenAt: typeof raw.frozenAt === "string" ? raw.frozenAt : null,
       reason: typeof raw.reason === "string" ? raw.reason : null,
       frozenUntil: typeof raw.frozenUntil === "string" ? raw.frozenUntil : null,
-      pathScope: typeof raw.pathScope === "string" ? raw.pathScope : null
+      pathScope: typeof raw.pathScope === "string" ? raw.pathScope : null,
+      actor: typeof raw.actor === "string" ? raw.actor : null
     };
   }
 

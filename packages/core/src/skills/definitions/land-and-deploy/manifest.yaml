@@ -16,6 +16,14 @@ outputSchema:
     deployOutput: { type: string }
     exitCode: { type: number }
     deployVerdict: { type: string, enum: ["PASS", "FAIL"] }
+    healthCheckUrl: {}
+    healthCheckVerdict: { type: string }
+    healthCheckAttempts: { type: number }
+    rollbackRequired: { type: boolean }
+    rollbackExecuted: { type: boolean }
+    rollbackOutput: {}
+    gitHead: { type: string }
+    gitBranch: { type: string }
     blockers: { type: array }
 artifactPath: land-and-deploy
 nextSkill: context-save

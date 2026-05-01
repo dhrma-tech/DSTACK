@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("setup-deploy");
+import { setupDeployHandler } from "../../../phase2-real-handlers.js";
+export default setupDeployHandler;

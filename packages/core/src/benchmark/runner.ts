@@ -3,6 +3,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import type { BenchmarkRun } from "@dstack/shared";
 import type { BenchmarkPromptResult, BenchmarkSummary, Provider } from "@dstack/shared";
+import { estimateGeminiCostUsd } from "@dstack/shared";
 import { nowIso, shortHash } from "../utils.js";
 
 export interface BenchmarkRunnerOptions {
@@ -28,7 +29,7 @@ export class BenchmarkRunner {
     return parseSuite(raw);
   }
 
-  async runSuite(suite: BenchmarkSuite, provider: Provider, modelOverride?: string | null): Promise<BenchmarkRun> {
+  async runSuite(suite: BenchmarkSuite, provider: Provider, modelOverride?: string | null, options: { evaluateQuality: boolean } = { evaluateQuality: true }): Promise<BenchmarkRun> {
     if (suite.prompts.length > 100) throw new Error("Benchmark hard cap exceeded: max 100 prompts.");
     const started = Date.now();
     const model = modelOverride ?? suite.model;
@@ -39,8 +40,8 @@ export class BenchmarkRunner {
       for await (const chunk of provider.generate({ model, systemPrompt: "Answer the benchmark prompt.", userMessage: prompt.prompt, tools: [], responseMimeType: "text/plain", temperature: 0.2, maxOutputTokens: 2048 })) {
         if (chunk.type === "text" && chunk.text) responseText += chunk.text;
       }
-      const criteriaScores = prompt.criteria.map((criterion) => ({ criterion, passed: containsAny(responseText, prompt.expectedOutputContains), score: containsAny(responseText, prompt.expectedOutputContains) ? 100 : 50 }));
-      const qualityScore = Math.round(criteriaScores.reduce((sum, item) => sum + item.score, 0) / Math.max(1, criteriaScores.length));
+      const criteriaScores = options.evaluateQuality ? prompt.criteria.map((criterion) => ({ criterion, passed: containsAny(responseText, prompt.expectedOutputContains), score: containsAny(responseText, prompt.expectedOutputContains) ? 100 : 50 })) : [];
+      const qualityScore = criteriaScores.length > 0 ? Math.round(criteriaScores.reduce((sum, item) => sum + item.score, 0) / criteriaScores.length) : 0;
       results.push({
         promptId: prompt.id,
         model,
@@ -51,7 +52,7 @@ export class BenchmarkRunner {
         inputTokens: await provider.countTokens(prompt.prompt, model),
         outputTokens: await provider.countTokens(responseText, model),
         criteriaScores,
-        error: null
+        error: options.evaluateQuality ? null : "Quality was not evaluated. Run with --live to evaluate provider responses."
       });
     }
     return {
@@ -68,14 +69,29 @@ export class BenchmarkRunner {
     };
   }
 
-  async estimate(suite: BenchmarkSuite): Promise<{ promptCount: number; estimatedTokens: number }> {
-    const promptTokens = suite.prompts.reduce((sum, prompt) => sum + Math.ceil(`${prompt.prompt}\n${prompt.scoringRubric}\n${prompt.criteria.join("\n")}`.length / 4), 0);
-    return { promptCount: suite.prompts.length, estimatedTokens: promptTokens * 2 };
+  async estimate(suite: BenchmarkSuite, models: string[] = [suite.model]): Promise<{ promptCount: number; estimatedInputTokens: number; estimatedOutputTokens: number; estimatedTokens: number; estimatedCostUsd: number | null; pricingDisclaimer: string }> {
+    const estimatedInputTokens = suite.prompts.reduce((sum, prompt) => sum + Math.ceil(`${prompt.prompt}\n${prompt.scoringRubric}\n${prompt.criteria.join("\n")}`.length / 4), 0) * models.length;
+    const estimatedOutputTokens = suite.prompts.reduce((sum, prompt) => sum + Math.max(64, Math.ceil(prompt.prompt.length / 3)), 0) * models.length;
+    const estimatedCostUsd = models.reduce<number | null>((sum, model) => {
+      const cost = estimateGeminiCostUsd(model, Math.ceil(estimatedInputTokens / models.length), Math.ceil(estimatedOutputTokens / models.length));
+      if (cost === null || sum === null) return null;
+      return sum + cost;
+    }, 0);
+    return {
+      promptCount: suite.prompts.length,
+      estimatedInputTokens,
+      estimatedOutputTokens,
+      estimatedTokens: estimatedInputTokens + estimatedOutputTokens,
+      estimatedCostUsd,
+      pricingDisclaimer: "Pricing may be outdated. Verify at ai.google.dev."
+    };
   }
 }
 
 export function summarize(results: BenchmarkPromptResult[], recommendation: string | null): BenchmarkSummary {
   const count = Math.max(1, results.length);
+  const evaluated = results.filter((item) => item.criteriaScores.length > 0 && item.error === null);
+  const qualityDenominator = Math.max(1, evaluated.length);
   const avgQualityScore = Math.round(results.reduce((sum, item) => sum + item.qualityScore, 0) / count);
   const avgLatencyMs = Math.round(results.reduce((sum, item) => sum + item.latencyMs, 0) / count);
   return {
@@ -83,7 +99,7 @@ export function summarize(results: BenchmarkPromptResult[], recommendation: stri
     avgLatencyMs,
     totalInputTokens: results.reduce((sum, item) => sum + item.inputTokens, 0),
     totalOutputTokens: results.reduce((sum, item) => sum + item.outputTokens, 0),
-    passRate: results.filter((item) => item.qualityScore >= 70).length / count,
+    passRate: evaluated.filter((item) => item.qualityScore >= 70).length / qualityDenominator,
     recommendation: recommendation ?? "Review benchmark results before changing model defaults.",
     bestQualityModel: null,
     bestLatencyModel: null

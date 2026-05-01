@@ -12,6 +12,7 @@ outputSchema:
   properties:
     frozen: { type: boolean }
     unfrozenAt: { type: string }
+    previousFreezeReason: {}
     previousFrozenSince: { type: string }
 artifactPath: unfreeze
 nextSkill: null

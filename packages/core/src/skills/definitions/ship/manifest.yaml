@@ -15,6 +15,7 @@ outputSchema:
     blockers: { type: array, items: { type: string } }
     changelogEntry: { type: string }
     suggestedTag: { type: string }
+    deployedAt: {}
     deployCommand: { type: string }
 artifactPath: ship
 nextSkill: context-save

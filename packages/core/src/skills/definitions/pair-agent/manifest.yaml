@@ -15,6 +15,7 @@ outputSchema:
   required: ["task", "sessionName", "plannedSteps", "executedSteps", "stepsCompleted", "stepsPlanned", "taskVerdict", "checkpointsPassed", "auditLogPath"]
   properties:
     task: { type: string }
+    sessionName: {}
     plannedSteps: { type: array }
     executedSteps: { type: array }
     stepsCompleted: { type: number }

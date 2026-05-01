@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("unfreeze");
+import { unfreezeHandler } from "../../../phase2-real-handlers.js";
+export default unfreezeHandler;

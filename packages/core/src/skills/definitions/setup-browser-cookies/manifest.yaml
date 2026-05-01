@@ -17,6 +17,7 @@ outputSchema:
     cookieCount: { type: number }
     sessionFilePath: { type: string }
     authenticationVerified: { type: boolean }
+    expiresAt: {}
     authIndicatorsFound: { type: array }
     warnings: { type: array }
 artifactPath: setup-browser-cookies

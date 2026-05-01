@@ -9,6 +9,7 @@ import { sanitize } from "./logger.js";
 import { PermissionGate } from "./permissions.js";
 import { atomicWrite, ensureDir, exists, fileSafeTimestamp, git, resolveInsideRoot } from "./utils.js";
 import { scanDomContent } from "./browser/dom-scanner.js";
+import { BrowserSessionManager } from "./browser/session-manager.js";
 
 const execAsync = promisify(exec);
 
@@ -140,27 +141,39 @@ async function searchFiles(projectRoot: string, pattern: string): Promise<Array<
 }
 
 function browserTools(): ToolHandler[] {
-  let context: BrowserContext | null = null;
-  let page: Page | null = null;
+  const contexts = new Map<string, BrowserContext>();
+  const pages = new Map<string, Page>();
+  let activeSession = "default";
   const logs: JsonObject[] = [];
-  const open = async (toolContext: ToolContext): Promise<Page> => {
-    if (!context) {
-      await ensureDir(path.join(toolContext.config.dstackDir, "browser", "session"));
-      context = await chromium.launchPersistentContext(path.join(toolContext.config.dstackDir, "browser", "session"), { headless: toolContext.config.browserHeadless });
-      page = context.pages()[0] ?? await context.newPage();
-      page.on("console", (message) => logs.push({ type: message.type(), text: message.text() }));
-      page.on("response", (response) => { if (response.status() >= 400) logs.push({ url: response.url(), status: response.status(), method: response.request().method() }); });
+  const open = async (toolContext: ToolContext, sessionName = activeSession): Promise<Page> => {
+    activeSession = sessionName;
+    const manager = new BrowserSessionManager({ projectRoot: toolContext.projectRoot, dstackDir: toolContext.config.dstackDir });
+    const sessionDir = manager.sessionDir(sessionName);
+    if (!contexts.has(sessionDir)) {
+      await ensureDir(sessionDir);
+      const browserContext = await chromium.launchPersistentContext(sessionDir, { headless: toolContext.config.browserHeadless });
+      const browserPage = browserContext.pages()[0] ?? await browserContext.newPage();
+      browserPage.on("console", (message) => logs.push({ session: sessionName, type: message.type(), text: message.text() }));
+      browserPage.on("response", (response) => { if (response.status() >= 400) logs.push({ session: sessionName, url: response.url(), status: response.status(), method: response.request().method() }); });
+      contexts.set(sessionDir, browserContext);
+      pages.set(sessionDir, browserPage);
     }
-    return page!;
+    return pages.get(sessionDir)!;
   };
   return [
-    tool("browser_open", "Open a URL.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.goto(stringInput(input.url, "url"), { waitUntil: "networkidle" }); return { success: true, title: await p.title() }; }),
-    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (_input, contextArg) => { const p = await open(contextArg); const scan = scanDomContent(await p.locator("body").innerText().catch(() => "")); return { url: p.url(), title: await p.title(), text: scan.sanitized, ariaTree: "", timestamp: new Date().toISOString(), promptInjectionDetected: scan.detected, promptInjectionFragments: scan.fragments }; }),
-    tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath }; }),
-    tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true }; }),
-    tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg); await p.locator(stringInput(input.ref, "ref")).first().fill(stringInput(input.text, "text")); return { success: true }; }),
+    tool("browser_open", "Open a URL.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.goto(stringInput(input.url, "url"), { waitUntil: "networkidle" }); return { success: true, title: await p.title(), session: activeSession }; }),
+    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const scan = scanDomContent(await p.locator("body").innerText().catch(() => "")); return { url: p.url(), title: await p.title(), text: scan.sanitized, ariaTree: "", timestamp: new Date().toISOString(), promptInjectionDetected: scan.detected, promptInjectionFragments: scan.fragments, session: activeSession }; }),
+    tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath, session: activeSession }; }),
+    tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true, session: activeSession }; }),
+    tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.locator(stringInput(input.ref, "ref")).first().fill(stringInput(input.text, "text")); return { success: true, session: activeSession }; }),
     tool("browser_get_logs", "Get browser logs.", "read", {}, async () => ({ consoleLogs: logs, networkLogs: logs })),
-    tool("browser_close", "Close browser.", "execute", {}, async () => { await context?.close(); context = null; page = null; return { success: true }; })
+    tool("browser_close", "Close browser.", "execute", {}, async () => {
+      await Promise.all([...contexts.values()].map((browserContext) => browserContext.close()));
+      contexts.clear();
+      pages.clear();
+      activeSession = "default";
+      return { success: true };
+    })
   ];
 }
 

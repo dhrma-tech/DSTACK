@@ -16,6 +16,7 @@ outputSchema:
     readmeScore: { type: number }
     readmeGaps: { type: array }
     envSetupScore: { type: number }
+    testRunTime: {}
     envSetupGaps: { type: array }
     criticalIssues: { type: array }
     mustFixBeforeProceeding: { type: array }

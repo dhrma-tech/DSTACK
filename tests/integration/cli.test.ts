@@ -26,9 +26,11 @@ describe("CLI", () => {
     const workspace = await tempWorkspace();
     try {
       const result = await route(await parseArgv(["--skill-check"], workspace.root));
+      expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("DStack Skill Check");
       expect(result.stdout).toContain("Total skills: 42");
       expect(result.stdout).toContain("Manifest validation: 42/42 loaded");
+      expect(result.stdout).toContain("Phase 2 central shim skills:");
     } finally {
       await workspace.cleanup();
     }
