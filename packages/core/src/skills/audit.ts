@@ -22,6 +22,8 @@ export interface SkillAuditReport {
   warnings: SkillAuditIssue[];
   checkedAt: string;
   centralShimSkills: string[];
+  partialSkills: string[];
+  highRiskPartialSkills: string[];
   passed: boolean;
 }
 
@@ -57,6 +59,29 @@ const phase2SkillNames = new Set([
   "plan-tune"
 ]);
 
+const highRiskSkills = new Set([
+  "land-and-deploy",
+  "setup-deploy", 
+  "scrape",
+  "browse",
+  "benchmark",
+  "benchmark-models",
+  "skillify",
+  "pair-agent",
+  "setup-browser-cookies",
+  "make-pdf",
+  "dstack-upgrade"
+]);
+
+// Skills known to be partial/experimental
+const partialSkills = new Set([
+  "pair-agent",
+  "benchmark-models",
+  "codex",
+  "cso",
+  "skillify"
+]);
+
 export class SkillAuditor {
   private readonly registry: SkillRegistry;
   private readonly tools = new ToolRegistry();
@@ -85,6 +110,7 @@ export class SkillAuditor {
       issues.push(...this.validateArtifactPath(skill));
       issues.push(...this.validateOutputSchemaShape(skill));
       issues.push(...this.validateFakeOutput(skill));
+      issues.push(...this.validateBehaviorFields(skill));
       const handlerIssues = await this.validateHandler(skill);
       issues.push(...handlerIssues.issues);
       if (handlerIssues.usesCentralShim) centralShimSkills.push(skill.name);
@@ -101,12 +127,25 @@ export class SkillAuditor {
 
     const errors = issues.filter((issue) => issue.severity === "error");
     const warnings = issues.filter((issue) => issue.severity === "warning");
+    
+    // Identify partial and high-risk partial skills
+    const partialSkillsFound = skills
+      .filter(skill => partialSkills.has(skill.name))
+      .map(skill => skill.name)
+      .sort();
+    
+    const highRiskPartialSkillsFound = partialSkillsFound
+      .filter(skillName => highRiskSkills.has(skillName))
+      .sort();
+    
     return {
       totalSkills: skills.length,
       errors,
       warnings,
       checkedAt: new Date().toISOString(),
       centralShimSkills: centralShimSkills.sort(),
+      partialSkills: partialSkillsFound,
+      highRiskPartialSkills: highRiskPartialSkillsFound,
       passed: errors.length === 0
     };
   }
@@ -165,6 +204,124 @@ export class SkillAuditor {
     }
     const issues = validateJsonSchema(skill.outputSchema, fixture, "$");
     return issues.map((issue) => ({ severity: "error" as const, skillName: skill.name, check: "fake-output", message: issue }));
+  }
+
+  private validateBehaviorFields(skill: SkillManifest): SkillAuditIssue[] {
+    const issues: SkillAuditIssue[] = [];
+    
+    // Only check high-risk skills for behavior fields
+    if (!highRiskSkills.has(skill.name)) {
+      return issues;
+    }
+
+    const schema = skill.outputSchema;
+    const properties = objectValue(schema.properties);
+    if (!properties) {
+      return issues; // Already caught by schema validation
+    }
+
+    // Skill-specific behavior field checks
+    switch (skill.name) {
+      case "land-and-deploy":
+        if (!properties.approvalRequired || !properties.deployVerdict || !properties.gitHead) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "land-and-deploy must include approvalRequired, deployVerdict, and gitHead fields for safety"
+          });
+        }
+        break;
+
+      case "scrape":
+        if (!properties.robots || !properties.allowed || !properties.scannerFindings) {
+          issues.push({
+            severity: "error", 
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "scrape must include robots, allowed, and scannerFindings fields for compliance"
+          });
+        }
+        break;
+
+      case "browse":
+        if (!properties.interactiveRefs || !properties.promptInjectionDetected) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields", 
+            message: "browse must include interactiveRefs and promptInjectionDetected fields for reliability"
+          });
+        }
+        break;
+
+      case "benchmark-models":
+        if (!properties.dryRun || !properties.estimate || !properties.liveMode) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "benchmark-models must include dryRun, estimate, or liveMode fields for cost control"
+          });
+        }
+        break;
+
+      case "pair-agent":
+        if (!properties.safetyFields || !properties.sessionToken || !properties.explicitSafety) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "pair-agent must include safetyFields, sessionToken, and explicitSafety for security"
+          });
+        }
+        break;
+
+      case "setup-browser-cookies":
+        if (!properties.manualApproval || !properties.sessionFields) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "setup-browser-cookies must include manualApproval and sessionFields for security"
+          });
+        }
+        break;
+
+      case "dstack-upgrade":
+        if (!properties.backup || !properties.verify || !properties.rollback) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "dstack-upgrade must include backup, verify, and rollback fields for safety"
+          });
+        }
+        break;
+
+      case "make-pdf":
+        if (!properties.outputPath || !properties.renderStatus) {
+          issues.push({
+            severity: "error",
+            skillName: skill.name,
+            check: "behavior-fields",
+            message: "make-pdf must include outputPath and renderStatus for validation"
+          });
+        }
+        break;
+    }
+
+    // Add warning for partial skills
+    if (partialSkills.has(skill.name)) {
+      issues.push({
+        severity: "warning",
+        skillName: skill.name,
+        check: "maturity",
+        message: `${skill.name} is marked as partial/experimental - use with caution`
+      });
+    }
+
+    return issues;
   }
 
   private async validateHandler(skill: SkillManifest): Promise<{ issues: SkillAuditIssue[]; usesCentralShim: boolean }> {

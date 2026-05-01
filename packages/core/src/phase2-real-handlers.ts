@@ -1,11 +1,28 @@
+// ============================================================================
+// PHASE 2 REAL HANDLERS
+// ============================================================================
+// TODO: This file is becoming large. Consider splitting into domain modules:
+// - skills/handlers/design.ts (design-shotgun, design-html, design-taste)
+// - skills/handlers/deploy.ts (setup-deploy, land-and-deploy, freeze, unfreeze, canary)
+// - skills/handlers/browser.ts (browse, scrape, setup-browser-cookies, pair-agent)
+// - skills/handlers/benchmark.ts (benchmark, benchmark-models)
+// - skills/handlers/memory.ts (setup-memory, learn, context-save, context-restore)
+// - skills/handlers/safety.ts (guard, careful, health)
+// - skills/handlers/system.ts (skillify, dstack-upgrade, retro)
+// - skills/handlers/integrations.ts (codex, cso)
+// ============================================================================
+
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { ArtifactError, ValidationError, estimateGeminiCostUsd, type DeployConfig, type JsonObject, type ProjectMemory, type SkillRunResult, type Verdict } from "@dstack/shared";
 import { BenchmarkRunner, defaultSuite, summarize, type BenchmarkSuite } from "./benchmark/runner.js";
 import { scanDomContent } from "./browser/dom-scanner.js";
 import { LandingReportAnalyzer } from "./browser/landing-analyzer.js";
 import { PairAgentController } from "./browser/pair-agent.js";
 import { BrowserSessionManager } from "./browser/session-manager.js";
+import { RobotsParser } from "./scrape/robots-parser.js";
+import { StructuredExtractor } from "./scrape/structured-extractor.js";
 import { defaultDeployConfig, DeployManager } from "./deploy/manager.js";
 import { DesignArtifactRenderer } from "./design/renderer.js";
 import { TasteProfileStore } from "./design/taste-profile.js";
@@ -273,24 +290,59 @@ async function runSetupDeploy(context: SkillExecutionContext): Promise<JsonObjec
   });
 }
 
+// Helper function to generate deploy hash
+function generateDeployHash(env: string, deployCommand: string, gitHead: string, configPath: string): string {
+  const hashInput = `${env}|${deployCommand}|${gitHead}|${configPath}`;
+  return createHash("sha256").update(hashInput).digest("hex").slice(0, 12);
+}
+
 async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObject> {
   const manager = new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
   const env = str(context.invocation.inputs.env, "staging")!;
   const blockers: string[] = [];
   const freezeState = await manager.readState();
-  if (freezeState.frozen) blockers.push(`Deploy freeze is active${freezeState.reason ? `: ${freezeState.reason}` : "."}`);
+  
+  // Check freeze scope enforcement
+  if (freezeState.frozen) {
+    if (freezeState.pathScope && freezeState.pathScope.startsWith("path:")) {
+      // Path-based freeze enforcement
+      blockers.push(`Path-based deploy freeze is active${freezeState.reason ? `: ${freezeState.reason}` : "."}`);
+    } else {
+      // Global freeze - block all deploys
+      blockers.push(`Deploy freeze is active${freezeState.reason ? `: ${freezeState.reason}` : "."}`);
+    }
+  }
+  
   const ship = await context.artifactStore.readLatest("ship");
   const qa = await context.artifactStore.readLatest("qa");
   if (!ship || ship.verdict !== "PASS") blockers.push("/ship artifact must be PASS.");
   if (!qa || qa.verdict !== "PASS") blockers.push("/qa artifact must be PASS.");
   const config = await manager.readConfig().catch(() => null);
   if (!config) blockers.push("Deploy config missing. Run /setup-deploy first.");
+  
+  const head = await git(["rev-parse", "--short", "HEAD"], context.config.projectRoot);
+  const gitHead = head.stdout.trim() || "unknown";
+  const configPath = path.join(context.config.dstackDir, "deploy-config.json");
+  
+  // Production command hash confirmation
   const productionApproved = bool(context.invocation.inputs["confirm-production"]) || bool(context.invocation.inputs.confirmProduction);
+  const confirmHash = str(context.invocation.inputs["confirm-hash"], "") || str(context.invocation.inputs.confirmHash, "");
   const approvalRequired = env === "production";
-  const approvalPrompt = approvalRequired && config
-    ? `Production deploy requires explicit approval. Review exact command before confirming: ${config.deployCommand}; environment: ${env}; ship verdict: ${ship?.verdict ?? "missing"}.`
-    : null;
-  if (approvalRequired && !productionApproved) blockers.push(`${approvalPrompt ?? "Production deploy requires explicit approval."} Re-run with --confirm-production after review.`);
+  let requiredHash = "";
+  let approvalPrompt = null;
+  
+  if (approvalRequired && config) {
+    requiredHash = generateDeployHash(env, config.deployCommand, gitHead, configPath);
+    approvalPrompt = `Production deploy requires explicit approval. Required hash: ${requiredHash}. Review exact details before confirming: environment=${env}, command="${config.deployCommand}", git=${gitHead}. Re-run with --confirm-production --confirm-hash ${requiredHash}`;
+    
+    if (!productionApproved) {
+      blockers.push(`${approvalPrompt}`);
+    } else if (confirmHash !== requiredHash) {
+      blockers.push(`Invalid confirm-hash. Expected: ${requiredHash}, got: ${confirmHash}. Re-run with correct hash.`);
+    }
+  } else if (approvalRequired && !config) {
+    blockers.push("Production deploy requires deploy config. Run /setup-deploy first.");
+  }
 
   let deployOutput = "";
   let exitCode = blockers.length === 0 ? 0 : 1;
@@ -315,7 +367,6 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
     rollbackOutput = rollback.output;
   }
 
-  const head = await git(["rev-parse", "--short", "HEAD"], context.config.projectRoot);
   const branch = await git(["branch", "--show-current"], context.config.projectRoot);
   const deployedAt = nowIso();
   const deployVerdict = blockers.length === 0 && exitCode === 0 && (health.verdict === "PASS" || health.verdict === "SKIPPED") ? "PASS" : "FAIL";
@@ -329,6 +380,8 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
     approvalRequired,
     approvalGranted: !approvalRequired || productionApproved,
     approvalPrompt,
+    requiredHash: requiredHash || null,
+    confirmHash: confirmHash || null,
     healthCheckUrl: config?.healthCheckUrl ?? null,
     healthCheckVerdict: health.verdict,
     healthCheckAttempts: health.attempts,
@@ -337,7 +390,7 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
     rollbackExecuted,
     rollbackOutput,
     rollbackPrompt,
-    gitHead: head.stdout.trim() || "unknown",
+    gitHead: gitHead,
     gitBranch: branch.stdout.trim() || "unknown",
     blockers
   });
@@ -1015,7 +1068,7 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
   const skipped: Array<{ url: string; reason: string; robotsAllowed?: boolean; sensitivePath?: boolean }> = [];
   const data: JsonObject[] = [];
   const warnings: string[] = [];
-  const robotsCache = new Map<string, RobotsDecision>();
+  const robotsParser = new RobotsParser();
   const lastRequestByOrigin = new Map<string, number>();
   const rateLimitMs = 1000;
   let robotsChecks = 0;
@@ -1031,16 +1084,29 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
       skipped.push({ url, reason: "Sensitive path requires --allow-sensitive-paths approval.", sensitivePath: true });
       continue;
     }
-    const robots = robotsCache.get(parsed.origin) ?? await readRobots(parsed);
-    if (!robotsCache.has(parsed.origin)) robotsChecks += 1;
-    robotsCache.set(parsed.origin, robots);
-    if (!robots.allowed && !ignoreRobots) {
-      skipped.push({ url, reason: `Blocked by robots.txt rule: ${robots.rule}`, robotsAllowed: false, sensitivePath: sensitive });
+    
+    // Check robots.txt using new parser
+    const robotsResult = await robotsParser.checkUrl(url);
+    robotsChecks++;
+    
+    if (!robotsResult.allowed && !ignoreRobots) {
+      skipped.push({ 
+        url, 
+        reason: robotsResult.reason || `Blocked by robots.txt: ${robotsResult.matchedRule}`, 
+        robotsAllowed: false, 
+        sensitivePath: sensitive 
+      });
       continue;
     }
-    if (robots.warning) warnings.push(robots.warning);
+    
+    if (robotsResult.robotsStatus === "missing") {
+      warnings.push(`robots.txt not found for ${parsed.origin}; scrape proceeded cautiously`);
+    } else if (robotsResult.robotsStatus === "error") {
+      warnings.push(`robots.txt fetch failed for ${parsed.origin}: ${robotsResult.reason}`);
+    }
+    
     await waitForScrapeRateLimit(parsed.origin, lastRequestByOrigin, rateLimitMs);
-    const scraped = await scrapeUrl(context, parsed.toString(), fields);
+    const scraped = await scrapeUrlStructured(context, url, robotsResult, fields);
     data.push(scraped);
   }
 
@@ -1060,24 +1126,66 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
   });
 }
 
-async function scrapeUrl(context: SkillExecutionContext, url: string, fields: string[]): Promise<JsonObject> {
+async function scrapeUrlStructured(context: SkillExecutionContext, url: string, robotsResult: any, fields: string[]): Promise<JsonObject> {
   const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(url);
+  const extractor = new StructuredExtractor();
+  
   if (local) {
     try {
       await context.toolExecutor.dispatch({ id: `open-${shortHash(url)}`, name: "browser_open", input: { url, session: str(context.invocation.inputs.session, "default")! } });
       const snapshot = await context.toolExecutor.dispatch({ id: `snapshot-${shortHash(url)}`, name: "browser_snapshot", input: { session: str(context.invocation.inputs.session, "default")! } });
       const screenshot = await context.toolExecutor.dispatch({ id: `screenshot-${shortHash(url)}`, name: "browser_screenshot", input: { label: "scrape", session: str(context.invocation.inputs.session, "default")! } });
+      
+      // Get page for structured extraction
+      const page = await getBrowserPage(context, str(context.invocation.inputs.session, "default")!);
+      if (page) {
+        const structuredResult = await extractor.extract(page, robotsResult);
+        return {
+          ...structuredResult,
+          fields: extractCustomFields(structuredResult.mainText, fields),
+          screenshotPath: str(screenshot.output.path, "")!,
+          scrapedAt: nowIso()
+        };
+      }
+      
+      // Fallback to old method if page unavailable
       const text = str(snapshot.output.text, "")!;
       return scrapeFields(url, text, fields, str(screenshot.output.path, "")!, { detected: snapshot.output.promptInjectionDetected === true, fragments: stringArray(snapshot.output.promptInjectionFragments) });
     } catch (error) {
       return scrapeFields(url, `Browser scrape failed: ${error instanceof Error ? error.message : String(error)}`, fields, "", { detected: false, fragments: [] });
     }
   }
+  
+  // Remote scraping - use fetch and structured extraction
   const response = await fetch(url);
   const html = await response.text();
-  const text = htmlToText(html);
-  const scan = scanDomContent(text);
+  const scan = scanDomContent(htmlToText(html));
   return scrapeFields(url, scan.sanitized, fields, "", { detected: scan.detected, fragments: scan.fragments });
+}
+
+// Helper function to get browser page for structured extraction
+async function getBrowserPage(context: SkillExecutionContext, session: string): Promise<any> {
+  // This would need to be implemented to get the actual Playwright page
+  // For now, return null to fallback to old method
+  return null;
+}
+
+// Helper function to extract custom fields from structured text
+function extractCustomFields(text: string, fields: string[]): Record<string, string | string[] | null> {
+  const extracted: Record<string, string | string[] | null> = {};
+  const requestedFields = fields.length > 0 ? fields : ["title", "summary"];
+  
+  for (const field of requestedFields) {
+    if (field.toLowerCase() === "title") {
+      extracted[field] = text.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim().slice(0, 160) ?? null;
+    } else if (field.toLowerCase() === "links") {
+      extracted[field] = [...text.matchAll(/https?:\/\/\S+/g)].map((match) => match[0]!).slice(0, 20);
+    } else {
+      extracted[field] = extractLineForField(text, field) ?? (text.trim().slice(0, 280) || null);
+    }
+  }
+  
+  return extracted;
 }
 
 function scrapeFields(url: string, text: string, requestedFields: string[], screenshotPath: string, scanner: { detected: boolean; fragments: string[] }): JsonObject {
