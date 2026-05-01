@@ -317,12 +317,47 @@ describe("Phase 2 hardening pass", () => {
       const config = await ConfigManager.load({ projectRoot: workspace.root });
       const artifacts = new ArtifactStore(config.dstackDir);
       await artifacts.write("autoplan", autoplanOutput());
-      await artifacts.write("plan-ceo-review", { overallVerdict: "FAIL", phaseReviews: [], globalConcerns: [], mustFixBeforeProceeding: ["Add an accessibility review task"], approvedAspects: [] });
+      await artifacts.write("plan-ceo-review", { overallVerdict: "FAIL", phaseReviews: [], globalConcerns: [], mustFixBeforeProceeding: ["Add an accessibility review task", "Add a CI task", "Document env setup", "Clarify release rollback"], approvedAspects: [] });
       const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
       const result = await executor.run(invocation("/plan-tune", workspace.root, { question: "When blocked by review?", decision: "Use plan-tune before re-review" }));
       expect(JSON.stringify(result.output?.issuesAddressed)).toContain("Add an accessibility review task");
+      expect((result.output?.issuesAddressed as JsonObject[]).length).toBe(3);
+      expect((result.output?.issuesDeferred as JsonObject[]).length).toBe(1);
+      expect((result.output?.revisedPlan as JsonObject).phases).toEqual(expect.any(Array));
       expect(result.output?.storedDecisionPreferences).toBe(1);
       expect(JSON.stringify(result.output?.preferenceState)).toContain("Use plan-tune before re-review");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  it("planning review handlers respond to autoplan and repository context", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const config = await ConfigManager.load({ projectRoot: workspace.root });
+      const artifacts = new ArtifactStore(config.dstackDir);
+      await artifacts.write("autoplan", {
+        ...autoplanOutput(),
+        phases: [{ name: "UI Delivery", goal: "Build dashboard", tasks: [{ id: "T1", title: "Build dashboard page", description: "Implement responsive frontend dashboard", tags: ["frontend"] }] }]
+      });
+      await artifacts.write("plan-eng-review", { overallVerdict: "PASS", mustFixBeforeProceeding: [], phaseReviews: [] });
+      const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
+
+      const design = await executor.run(invocation("/plan-design-review", workspace.root));
+      expect(design.output?.overallVerdict).toBe("REVISE");
+      expect(JSON.stringify(design.output?.accessibilityFlags)).toContain("Accessibility");
+
+      const devexPlan = await executor.run(invocation("/plan-devex-review", workspace.root));
+      expect(Number(devexPlan.output?.setupComplexityScore)).toBeGreaterThanOrEqual(4);
+      expect(JSON.stringify(devexPlan.output?.mustFixBeforeProceeding)).toContain("setup complexity");
+
+      await writeFile(path.join(workspace.root, "README.md"), "# App\n\n## Getting started\nInstall dependencies, configure environment variables, and run tests to verify setup.\n", "utf8");
+      await writeFile(path.join(workspace.root, ".env.example"), "NODE_ENV=test\n", "utf8");
+      await writeFile(path.join(workspace.root, "package.json"), JSON.stringify({ scripts: { dev: "echo dev", test: "echo test", lint: "echo lint" } }, null, 2), "utf8");
+      await mkdir(path.join(workspace.root, ".github", "workflows"), { recursive: true });
+      const devex = await executor.run(invocation("/devex-review", workspace.root));
+      expect(Number(devex.output?.overallScore)).toBeGreaterThanOrEqual(80);
+      expect(devex.output?.overallVerdict).not.toBe("FAIL");
     } finally {
       await workspace.cleanup();
     }

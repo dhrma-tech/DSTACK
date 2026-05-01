@@ -613,6 +613,7 @@ async function runPlanTune(context: SkillExecutionContext): Promise<JsonObject> 
   const autoplan = await context.artifactStore.requireLatest("autoplan");
   const reviews = await readReviewArtifacts(context, ["plan-ceo-review", "plan-eng-review", "plan-design-review", "plan-devex-review", "design-review", "devex-review"]);
   const tuned = new PlanTuner({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).tune({ autoplan: autoplan.content, reviews });
+  assertAutoplanShape(tuned.revisedPlan);
   return mark(context, {
     ...tuned,
     baseArtifactTimestamp: autoplan.createdAt,
@@ -621,6 +622,13 @@ async function runPlanTune(context: SkillExecutionContext): Promise<JsonObject> 
     preferenceState: nextPreferences as unknown as JsonObject,
     storedDecisionPreferences: nextPreferences.entries.length
   });
+}
+
+function assertAutoplanShape(plan: JsonObject): void {
+  const missing = ["planVersion", "generatedAt", "phases", "openDecisions", "riskFlags", "assumptionsMade"].filter((key) => plan[key] === undefined);
+  if (missing.length > 0 || !Array.isArray(plan.phases) || !Array.isArray(plan.openDecisions) || !Array.isArray(plan.riskFlags) || !Array.isArray(plan.assumptionsMade)) {
+    throw new ValidationError(`/plan-tune revisedPlan failed autoplan schema validation: missing or invalid ${missing.join(", ") || "array fields"}.`);
+  }
 }
 
 async function runFreeze(context: SkillExecutionContext): Promise<JsonObject> {

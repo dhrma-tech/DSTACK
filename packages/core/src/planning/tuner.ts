@@ -27,7 +27,8 @@ export class PlanTuner {
     const revisedPlan = structuredClone(request.autoplan) as JsonObject;
     const phases = Array.isArray(revisedPlan.phases) ? revisedPlan.phases : [];
     const firstPhase = phases.find(isJsonObject);
-    const addressed = issues.slice(0, Math.max(1, issues.length === 0 ? 0 : issues.length)).map((issue) => ({
+    const addressedIssues = issues.slice(0, 3);
+    const addressed = addressedIssues.map((issue) => ({
       source: issue.source,
       issue: issue.text,
       resolution: `Added or adjusted plan task to address: ${issue.text}`,

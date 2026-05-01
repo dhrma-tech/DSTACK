@@ -5,7 +5,12 @@ model: gemini-2.5-pro-preview
 streaming: true
 requiresArtifacts: ["autoplan"]
 allowedTools: ["read_file"]
-inputs: []
+inputs:
+  - { name: question, type: string, required: false, description: Decision preference question to store }
+  - { name: decision, type: string, required: false, description: Decision preference answer to store }
+  - { name: preference, type: string, required: false, description: Alternative decision preference value }
+  - { name: list, type: boolean, required: false, description: List stored planning preferences while tuning }
+  - { name: reset, type: boolean, required: false, description: Reset stored planning preferences before tuning }
 outputSchema:
   type: object
   required: ["baseArtifactTimestamp", "reviewsConsidered", "issuesAddressed", "issuesDeferred", "changeLog", "revisedPlan"]
