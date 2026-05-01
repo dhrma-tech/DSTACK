@@ -40,7 +40,12 @@ export function directPhase2Handler(run: DirectRunner): SkillHandler {
   };
 }
 
-export const designShotgunHandler = directPhase2Handler(runDesignShotgun);
+export const designShotgunHandler: SkillHandler = {
+  ...directPhase2Handler(runDesignShotgun),
+  async postSave(_output, context) {
+    await recordDesignShotgunTaste(context);
+  }
+};
 export const benchmarkHandler = directPhase2Handler(runBenchmark);
 export const benchmarkModelsHandler = directPhase2Handler(runBenchmarkModels);
 export const setupDeployHandler = directPhase2Handler(runSetupDeploy);
@@ -90,9 +95,6 @@ async function runDesignShotgun(context: SkillExecutionContext): Promise<JsonObj
   const preferences = await taste.getTopPreferences();
   const selectedVariant = str(context.invocation.inputs.selected, null) ?? str(context.invocation.inputs.variant, null);
   const verdict = str(context.invocation.inputs["taste-verdict"], null);
-  if (selectedVariant && (verdict === "approved" || verdict === "rejected")) {
-    await taste.record({ variantName: selectedVariant, verdict, reason: str(context.invocation.inputs.reason, "Recorded from /design-shotgun invocation.")! });
-  }
 
   const prefix = titleWords(subject, 3);
   const variants = [
@@ -113,7 +115,19 @@ async function runDesignShotgun(context: SkillExecutionContext): Promise<JsonObj
     tastePreferences: preferences as unknown as JsonObject[],
     variants: variants as unknown as JsonObject[],
     recommendation: recommended,
-    decisionCriteria: [`How often users need to inspect ${subject}`, "Mobile usage expectations", "Need for side-by-side comparison", preferences.length > 0 ? "Persisted taste profile preferences" : "No taste profile has been recorded yet"]
+    decisionCriteria: [`How often users need to inspect ${subject}`, "Mobile usage expectations", "Need for side-by-side comparison", preferences.length > 0 ? "Persisted taste profile preferences" : "No taste profile has been recorded yet"],
+    tasteProfileRecordingRequested: Boolean(selectedVariant && (verdict === "approved" || verdict === "rejected"))
+  });
+}
+
+async function recordDesignShotgunTaste(context: SkillExecutionContext): Promise<void> {
+  const selectedVariant = str(context.invocation.inputs.selected, null) ?? str(context.invocation.inputs.variant, null);
+  const verdict = str(context.invocation.inputs["taste-verdict"], null);
+  if (!selectedVariant || (verdict !== "approved" && verdict !== "rejected")) return;
+  await new TasteProfileStore({ dstackDir: context.config.dstackDir }).record({
+    variantName: selectedVariant,
+    verdict,
+    reason: str(context.invocation.inputs.reason, "Recorded from /design-shotgun invocation.")!
   });
 }
 

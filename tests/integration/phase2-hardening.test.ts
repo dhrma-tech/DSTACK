@@ -12,6 +12,7 @@ import {
   SafetyModeManager,
   SkillAuditor,
   SkillExecutor,
+  TasteProfileStore,
   ToolExecutor,
   ToolRegistry,
   type ModelChunk,
@@ -139,6 +140,16 @@ describe("Phase 2 hardening pass", () => {
       expect(String(variants?.[0]?.name)).toContain("Billing Console");
       expect(JSON.stringify(variants)).toContain("invoice table");
       expect(result.output?.recommendation).not.toBe("Card Explorer");
+
+      const dryTaste = await executor.run(invocation("/design-shotgun", workspace.root, { screen: "Billing Console", selected: String(variants?.[0]?.name), "taste-verdict": "approved" }, { dryRun: true }));
+      expect(dryTaste.artifactPath).toBeNull();
+      expect(await new TasteProfileStore({ dstackDir: config.dstackDir }).all()).toHaveLength(0);
+
+      const savedTaste = await executor.run(invocation("/design-shotgun", workspace.root, { screen: "Billing Console", selected: String(variants?.[0]?.name), "taste-verdict": "approved", reason: "Best operational fit" }));
+      expect(savedTaste.artifactPath).toEqual(expect.stringContaining("design-shotgun"));
+      const tasteEntries = await new TasteProfileStore({ dstackDir: config.dstackDir }).all();
+      expect(tasteEntries).toHaveLength(1);
+      expect(tasteEntries[0]?.reason).toBe("Best operational fit");
     } finally {
       await workspace.cleanup();
     }
