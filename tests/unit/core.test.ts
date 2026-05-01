@@ -361,6 +361,38 @@ describe("Phase 2 modules", () => {
     }
   });
 
+  it("propagates stale artifacts through deep and missing intermediate dependencies", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const dstackDir = path.join(workspace.root, ".dstack");
+      const artifacts = new ArtifactStore(dstackDir);
+      await artifacts.write("office-hours", { projectName: "Demo" });
+      await artifacts.write("autoplan", { planVersion: "1", phases: [], openDecisions: [], riskFlags: [], assumptionsMade: [] });
+      await artifacts.write("plan-ceo-review", { overallVerdict: "PASS", phaseReviews: [], globalConcerns: [], mustFixBeforeProceeding: [], approvedAspects: [] });
+      await artifacts.write("plan-eng-review", { overallVerdict: "PASS", taskReviews: [], architectureConcerns: [], missingInfrastructure: [], securityFlags: [], testingGaps: [], mustFixBeforeProceeding: [] });
+      await artifacts.write("design-consultation", { screens: [], userFlows: [], designPrinciples: [], responsiveStrategy: "responsive", openDesignDecisions: [] });
+      await artifacts.write("design-review", { overallVerdict: "PASS", missingScreens: [], componentConcerns: [], accessibilityIssues: [], visualConsistencyIssues: [], mustFixBeforeProceeding: [] });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await artifacts.write("autoplan", { planVersion: "2", phases: [], openDecisions: [], riskFlags: [], assumptionsMade: [] });
+      const stale = await new StalenessDetector({ dstackDir }).detect();
+      expect(stale.map((entry) => entry.skillName)).toEqual(expect.arrayContaining(["plan-ceo-review", "plan-eng-review", "design-consultation", "design-review"]));
+
+      const missingIntermediateDir = path.join(workspace.root, ".dstack-missing");
+      const missingArtifacts = new ArtifactStore(missingIntermediateDir);
+      await missingArtifacts.write("office-hours", { projectName: "Demo" });
+      await missingArtifacts.write("autoplan", { planVersion: "1", phases: [], openDecisions: [], riskFlags: [], assumptionsMade: [] });
+      await missingArtifacts.write("plan-eng-review", { overallVerdict: "PASS", taskReviews: [], architectureConcerns: [], missingInfrastructure: [], securityFlags: [], testingGaps: [], mustFixBeforeProceeding: [] });
+      await missingArtifacts.write("design-review", { overallVerdict: "PASS", missingScreens: [], componentConcerns: [], accessibilityIssues: [], visualConsistencyIssues: [], mustFixBeforeProceeding: [] });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await missingArtifacts.write("autoplan", { planVersion: "2", phases: [], openDecisions: [], riskFlags: [], assumptionsMade: [] });
+      const staleThroughMissing = await new StalenessDetector({ dstackDir: missingIntermediateDir }).detect();
+      expect(staleThroughMissing.map((entry) => entry.skillName)).toContain("design-review");
+      expect(staleThroughMissing.find((entry) => entry.skillName === "design-review")?.staleBecauseOf).toBe("autoplan");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   it("computes review dashboard readiness", async () => {
     const workspace = await tempWorkspace();
     try {

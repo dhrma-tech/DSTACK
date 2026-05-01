@@ -19,7 +19,7 @@ export const workflowDependencyGraph: Record<string, string[]> = {
   "design-consultation": ["plan-eng-review"],
   "design-shotgun": ["design-consultation", "plan-eng-review"],
   "design-html": ["design-consultation", "design-shotgun"],
-  "design-review": ["design-consultation"],
+  "design-review": ["design-consultation", "design-html"],
   review: ["autoplan"],
   "devex-review": ["autoplan"],
   qa: ["review"],
@@ -30,8 +30,8 @@ export const workflowDependencyGraph: Record<string, string[]> = {
   "land-and-deploy": ["setup-deploy", "ship"],
   retro: ["ship"],
   "setup-memory": ["retro"],
-  cso: ["office-hours", "autoplan"],
-  codex: ["autoplan"],
+  cso: ["office-hours", "autoplan", "plan-ceo-review", "plan-eng-review", "plan-design-review", "plan-devex-review", "review", "qa", "ship", "retro"],
+  codex: ["review"],
   "make-pdf": [],
   health: [],
   guard: [],
@@ -63,21 +63,34 @@ export class StalenessDetector {
     for (const skillName of this.topologicalOrder()) {
       const artifact = artifacts.get(skillName);
       if (!artifact) continue;
-      const deps = this.graph[skillName] ?? [];
-      for (const dependency of deps) {
-        const dependencyArtifact = artifacts.get(dependency);
-        if (!dependencyArtifact) continue;
-        const directStale = timestampOf(dependencyArtifact) > timestampOf(artifact);
-        const propagated = stale.get(dependency);
-        if (!directStale && !propagated) continue;
-        const cause = directStale ? dependency : propagated!.staleBecauseOf;
-        const staleSince = directStale ? dependencyArtifact.createdAt : propagated!.staleSince;
+      const dependencies = this.transitiveDependencies(skillName);
+      const staleDependency = dependencies
+        .map((dependency) => ({ dependency, artifact: artifacts.get(dependency) }))
+        .filter((entry): entry is { dependency: string; artifact: Artifact } => Boolean(entry.artifact))
+        .filter((entry) => timestampOf(entry.artifact) > timestampOf(artifact))
+        .sort((a, b) => timestampOf(b.artifact) - timestampOf(a.artifact))[0];
+      if (staleDependency) {
         stale.set(skillName, {
           skillName,
           artifactPath: artifact.filePath,
           artifactTimestamp: artifact.createdAt,
-          staleBecauseOf: cause,
-          staleSince,
+          staleBecauseOf: staleDependency.dependency,
+          staleSince: staleDependency.artifact.createdAt,
+          severity: severityFor(skillName),
+          recommendation: `Re-run /${skillName}`
+        });
+        continue;
+      }
+      for (const dependency of this.graph[skillName] ?? []) {
+        const dependencyArtifact = artifacts.get(dependency);
+        const propagated = stale.get(dependency);
+        if (!dependencyArtifact || !propagated) continue;
+        stale.set(skillName, {
+          skillName,
+          artifactPath: artifact.filePath,
+          artifactTimestamp: artifact.createdAt,
+          staleBecauseOf: propagated.staleBecauseOf,
+          staleSince: propagated.staleSince,
           severity: severityFor(skillName),
           recommendation: `Re-run /${skillName}`
         });
@@ -113,6 +126,20 @@ export class StalenessDetector {
     };
     for (const node of nodes) visit(node);
     return order;
+  }
+
+  private transitiveDependencies(skillName: string): string[] {
+    const queue = [...(this.graph[skillName] ?? [])];
+    const dependencies: string[] = [];
+    const seen = new Set<string>();
+    while (queue.length > 0) {
+      const dependency = queue.shift()!;
+      if (seen.has(dependency)) continue;
+      seen.add(dependency);
+      dependencies.push(dependency);
+      queue.push(...(this.graph[dependency] ?? []));
+    }
+    return dependencies;
   }
 }
 
