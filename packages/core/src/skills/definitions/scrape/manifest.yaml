@@ -19,6 +19,8 @@ outputSchema:
     robotsRespected: { type: boolean }
     data: { type: array }
     dataFilePath: { type: string }
+    rateLimitMs: { type: number }
+    robotsChecks: { type: number }
     warnings: { type: array }
 artifactPath: scrape
 nextSkill: null

@@ -1016,6 +1016,9 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
   const data: JsonObject[] = [];
   const warnings: string[] = [];
   const robotsCache = new Map<string, RobotsDecision>();
+  const lastRequestByOrigin = new Map<string, number>();
+  const rateLimitMs = 1000;
+  let robotsChecks = 0;
 
   for (const url of urls) {
     const parsed = parseUrl(url);
@@ -1029,12 +1032,14 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
       continue;
     }
     const robots = robotsCache.get(parsed.origin) ?? await readRobots(parsed);
+    if (!robotsCache.has(parsed.origin)) robotsChecks += 1;
     robotsCache.set(parsed.origin, robots);
     if (!robots.allowed && !ignoreRobots) {
       skipped.push({ url, reason: `Blocked by robots.txt rule: ${robots.rule}`, robotsAllowed: false, sensitivePath: sensitive });
       continue;
     }
     if (robots.warning) warnings.push(robots.warning);
+    await waitForScrapeRateLimit(parsed.origin, lastRequestByOrigin, rateLimitMs);
     const scraped = await scrapeUrl(context, parsed.toString(), fields);
     data.push(scraped);
   }
@@ -1049,6 +1054,8 @@ async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
     robotsRespected: !ignoreRobots,
     data,
     dataFilePath,
+    rateLimitMs,
+    robotsChecks,
     warnings: skipped.length === urls.length ? ["No URLs were scraped; all requested URLs were blocked or invalid.", ...warnings] : warnings
   });
 }
@@ -1756,6 +1763,16 @@ function disallowRuleFor(robots: string, pathname: string): string | null {
     if (applies && field === "disallow" && value && pathname.startsWith(value)) return value;
   }
   return null;
+}
+
+async function waitForScrapeRateLimit(origin: string, lastRequestByOrigin: Map<string, number>, minimumDelayMs: number): Promise<void> {
+  const now = Date.now();
+  const lastRequestAt = lastRequestByOrigin.get(origin);
+  if (typeof lastRequestAt === "number") {
+    const waitMs = minimumDelayMs - (now - lastRequestAt);
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+  lastRequestByOrigin.set(origin, Date.now());
 }
 
 function htmlToText(html: string): string {

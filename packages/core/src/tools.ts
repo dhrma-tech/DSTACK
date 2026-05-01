@@ -171,7 +171,29 @@ function browserTools(): ToolHandler[] {
     return pages.get(sessionDir)!;
   };
   return [
-    tool("browser_open", "Open a URL.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.goto(stringInput(input.url, "url"), { waitUntil: "networkidle" }); return { success: true, title: await p.title(), session: activeSession }; }),
+    tool("browser_open", "Open a URL.", "execute", {}, async (input, contextArg) => {
+      const url = stringInput(input.url, "url");
+      const sessionName = typeof input.session === "string" ? input.session : activeSession;
+      const manager = new BrowserSessionManager({ projectRoot: contextArg.projectRoot, dstackDir: contextArg.config.dstackDir });
+      const p = await open(contextArg, sessionName);
+      try {
+        await p.goto(url, { waitUntil: "networkidle" });
+        manager.recordNavigationSuccess(url);
+        return { success: true, title: await p.title(), session: activeSession, authWallPauseRequired: false };
+      } catch (error) {
+        if (manager.recordNavigationFailure(url)) {
+          return {
+            success: false,
+            title: await p.title().catch(() => ""),
+            session: activeSession,
+            authWallPauseRequired: true,
+            authWallInstructions: "Navigation failed 3 consecutive times for this origin. Open the same URL in a visible browser, complete auth/CAPTCHA/MFA if needed, then retry the DStack browser action.",
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+        throw error;
+      }
+    }),
     tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const scan = scanDomContent(await p.locator("body").innerText().catch(() => "")); return { url: p.url(), title: await p.title(), text: scan.sanitized, ariaTree: "", timestamp: new Date().toISOString(), promptInjectionDetected: scan.detected, promptInjectionFragments: scan.fragments, session: activeSession }; }),
     tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath, session: activeSession }; }),
     tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true, session: activeSession }; }),

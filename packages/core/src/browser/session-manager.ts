@@ -23,7 +23,7 @@ export interface BrowserSessionMetadata {
 
 export class BrowserSessionManager {
   readonly sessionsRoot: string;
-  private readonly navigationFailures = new Map<string, number>();
+  private static readonly navigationFailures = new Map<string, number>();
 
   constructor(private readonly options: BrowserSessionManagerOptions) {
     this.sessionsRoot = path.join(options.dstackDir, "browser", "sessions");
@@ -114,9 +114,13 @@ export class BrowserSessionManager {
 
   recordNavigationFailure(url: string): boolean {
     const origin = originOf(url);
-    const failures = (this.navigationFailures.get(origin) ?? 0) + 1;
-    this.navigationFailures.set(origin, failures);
+    const failures = (BrowserSessionManager.navigationFailures.get(origin) ?? 0) + 1;
+    BrowserSessionManager.navigationFailures.set(origin, failures);
     return failures >= 3;
+  }
+
+  recordNavigationSuccess(url: string): void {
+    BrowserSessionManager.navigationFailures.delete(originOf(url));
   }
 
   cookieSetupLaunchOptions(): { headless: false; userDataDir: string } {

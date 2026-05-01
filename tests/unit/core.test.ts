@@ -547,4 +547,20 @@ describe("Phase 2 modules", () => {
       await workspace.cleanup();
     }
   });
+
+  it("tracks auth-wall navigation failures across manager instances and resets on success", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const url = "https://auth.example.test/login";
+      const first = new BrowserSessionManager({ projectRoot: workspace.root, dstackDir: path.join(workspace.root, ".dstack") });
+      const second = new BrowserSessionManager({ projectRoot: workspace.root, dstackDir: path.join(workspace.root, ".dstack") });
+      expect(first.recordNavigationFailure(url)).toBe(false);
+      expect(second.recordNavigationFailure(url)).toBe(false);
+      expect(first.recordNavigationFailure(url)).toBe(true);
+      second.recordNavigationSuccess(url);
+      expect(first.recordNavigationFailure(url)).toBe(false);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
 });

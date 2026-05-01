@@ -222,6 +222,8 @@ describe("Phase 2 hardening pass", () => {
       expect(result.output?.scrapedUrls).toEqual([]);
       expect(JSON.stringify(result.output?.skippedUrls)).toContain("Blocked by robots.txt");
       expect(result.output?.robotsRespected).toBe(true);
+      expect(result.output?.robotsChecks).toBe(1);
+      expect(result.output?.rateLimitMs).toBe(1000);
     } finally {
       await workspace.cleanup();
     }
