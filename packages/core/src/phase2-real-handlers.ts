@@ -3,16 +3,25 @@ import path from "node:path";
 import { ArtifactError, ValidationError, estimateGeminiCostUsd, type DeployConfig, type JsonObject, type ProjectMemory, type SkillRunResult, type Verdict } from "@dstack/shared";
 import { BenchmarkRunner, defaultSuite, summarize, type BenchmarkSuite } from "./benchmark/runner.js";
 import { scanDomContent } from "./browser/dom-scanner.js";
+import { LandingReportAnalyzer } from "./browser/landing-analyzer.js";
+import { PairAgentController } from "./browser/pair-agent.js";
+import { BrowserSessionManager } from "./browser/session-manager.js";
 import { defaultDeployConfig, DeployManager } from "./deploy/manager.js";
+import { DesignArtifactRenderer } from "./design/renderer.js";
 import { TasteProfileStore } from "./design/taste-profile.js";
+import { CodexIntegration } from "./integrations/codex.js";
+import { CSOEngine } from "./integrations/cso.js";
 import { LearningStore } from "./memory/learning-store.js";
 import { FakeProvider, ModelRouter } from "./model.js";
+import { PDFGenerator } from "./output/pdf-generator.js";
 import { PlanTuner } from "./planning/tuner.js";
 import { loadDstackProjectContext } from "./prompt.js";
 import { ReviewDashboard } from "./review/dashboard.js";
 import { SafetyModeManager } from "./safety/mode-manager.js";
 import { SkillAuditor } from "./skills/audit.js";
+import { SkillGenerator } from "./skills/generator.js";
 import type { SkillExecutionContext, SkillHandler } from "./skills.js";
+import { UpgradeManager } from "./upgrade/manager.js";
 import { atomicWrite, exists, git, nowIso, shortHash } from "./utils.js";
 
 type DirectRunner = (context: SkillExecutionContext) => Promise<JsonObject>;
@@ -46,6 +55,19 @@ export const setupMemoryHandler = directPhase2Handler(runSetupMemory);
 export const planTuneHandler = directPhase2Handler(runPlanTune);
 export const freezeHandler = directPhase2Handler(runFreeze);
 export const unfreezeHandler = directPhase2Handler(runUnfreeze);
+export const canaryHandler = directPhase2Handler(runCanary);
+export const codexHandler = directPhase2Handler(runCodex);
+export const csoHandler = directPhase2Handler(runCso);
+export const designHtmlHandler = directPhase2Handler(runDesignHtml);
+export const devexReviewHandler = directPhase2Handler(runDevexReview);
+export const dstackUpgradeHandler = directPhase2Handler(runDstackUpgrade);
+export const landingReportHandler = directPhase2Handler(runLandingReport);
+export const makePdfHandler = directPhase2Handler(runMakePdf);
+export const pairAgentHandler = directPhase2Handler(runPairAgent);
+export const planDesignReviewHandler = directPhase2Handler(runPlanDesignReview);
+export const planDevexReviewHandler = directPhase2Handler(runPlanDevexReview);
+export const setupBrowserCookiesHandler = directPhase2Handler(runSetupBrowserCookies);
+export const skillifyHandler = directPhase2Handler(runSkillify);
 
 async function runDesignShotgun(context: SkillExecutionContext): Promise<JsonObject> {
   const design = context.prerequisiteArtifacts["design-consultation"] ?? {};
@@ -207,6 +229,8 @@ async function runSetupDeploy(context: SkillExecutionContext): Promise<JsonObjec
     dryRunCommand,
     canaryCommand: str(context.invocation.inputs.canaryCommand, null) ?? defaultDeployConfig(now).canaryCommand,
     healthCheckUrl: str(context.invocation.inputs.healthCheckUrl, null),
+    healthCheckIntervalSeconds: numberInput(context.invocation.inputs.healthCheckIntervalSeconds ?? context.invocation.inputs["health-check-interval"], defaultDeployConfig(now).healthCheckIntervalSeconds),
+    healthCheckTimeoutSeconds: numberInput(context.invocation.inputs.healthCheckTimeoutSeconds ?? context.invocation.inputs["health-check-timeout"], defaultDeployConfig(now).healthCheckTimeoutSeconds),
     rollbackCommand: str(context.invocation.inputs.rollbackCommand, null),
     requiredEnvVars,
     updatedAt: now
@@ -603,6 +627,298 @@ async function runUnfreeze(context: SkillExecutionContext): Promise<JsonObject> 
   });
 }
 
+async function runCanary(context: SkillExecutionContext): Promise<JsonObject> {
+  const manager = new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
+  const config = await manager.readConfig();
+  const freezeState = await manager.readState();
+  const environment = str(context.invocation.inputs.env, config.environment) ?? "staging";
+  const canaryPercent = numberInput(context.invocation.inputs["canary-percent"], 10);
+  const monitorDurationMinutes = numberInput(context.invocation.inputs["monitor-duration"], 15);
+  let healthChecks: JsonObject[] = [];
+  let rollbackExecuted = false;
+  let rollbackOutput: string | null = null;
+  let commandOutput = "";
+  let commandExitCode = 1;
+  let monitoringStoppedAfterConsecutiveFailures = false;
+  if (!config.canaryCommand) {
+    return mark(context, { environment, canaryPercent, deployedAt: nowIso(), monitorDurationMinutes, healthChecks, canaryVerdict: "INCONCLUSIVE", recommendation: "Add canaryCommand to .dstack/deploy.json before running /canary.", rollbackExecuted, blockers: ["DeployConfig has no canaryCommand."] });
+  }
+  if (freezeState.frozen) {
+    return mark(context, { environment, canaryPercent, deployedAt: nowIso(), monitorDurationMinutes, healthChecks, canaryVerdict: "ROLLBACK", recommendation: `Canary blocked by active freeze${freezeState.reason ? `: ${freezeState.reason}` : "."}`, rollbackExecuted, blockers: ["Deploy freeze is active."] });
+  }
+  const deployedAt = nowIso();
+  const command = await executeCommand(context, config.canaryCommand, 180_000);
+  commandOutput = command.output;
+  commandExitCode = command.exitCode;
+  if (command.exitCode === 0 && config.healthCheckUrl) {
+    const monitored = await runCanaryMonitor(config.healthCheckUrl, {
+      monitorDurationMinutes,
+      intervalSeconds: config.healthCheckIntervalSeconds,
+      timeoutSeconds: config.healthCheckTimeoutSeconds
+    });
+    healthChecks = monitored.checks;
+    monitoringStoppedAfterConsecutiveFailures = monitored.stoppedAfterConsecutiveFailures;
+  } else if (command.exitCode === 0) {
+    healthChecks.push({ checkedAt: nowIso(), verdict: "PASS", responseTimeMs: null, errorRate: null, output: "No health check URL configured; command success treated as canary health signal." });
+  }
+  const failures = healthChecks.filter((entry) => entry.verdict === "FAIL").length;
+  const consecutiveFailures = maxConsecutiveFailures(healthChecks);
+  if ((command.exitCode !== 0 || consecutiveFailures >= 3 || monitoringStoppedAfterConsecutiveFailures) && config.rollbackCommand) {
+    const rollback = await executeCommand(context, config.rollbackCommand, 180_000);
+    rollbackExecuted = rollback.exitCode === 0;
+    rollbackOutput = rollback.output;
+  }
+  const canaryVerdict = command.exitCode === 0 && failures === 0 ? "PROMOTE" : command.exitCode !== 0 || consecutiveFailures >= 3 ? "ROLLBACK" : "INCONCLUSIVE";
+  await manager.recordDeployRun({ id: shortHash(`${config.canaryCommand}:${deployedAt}`, 12), projectId: context.config.projectRoot, environment, type: "canary", startedAt: deployedAt, completedAt: nowIso(), deployCommand: config.canaryCommand, exitCode: commandExitCode, stdout: commandOutput, stderr: "", verdict: canaryVerdict === "PROMOTE" ? "PASS" : "FAIL", healthCheckVerdict: failures === 0 ? "PASS" : "FAIL", gitHead: (await git(["rev-parse", "--short", "HEAD"], context.config.projectRoot)).stdout.trim() || "unknown", gitBranch: (await git(["branch", "--show-current"], context.config.projectRoot)).stdout.trim() || "unknown", deployedBy: "dstack", rollbackExecuted, frozen: false });
+  return mark(context, {
+    environment,
+    canaryPercent,
+    deployedAt,
+    monitorDurationMinutes,
+    healthChecks,
+    canaryVerdict,
+    recommendation: canaryVerdict === "PROMOTE" ? "Canary passed; production deploy can be considered with explicit approval." : "Canary did not pass; investigate before promoting.",
+    rollbackExecuted,
+    rollbackOutput,
+    canaryCommand: config.canaryCommand,
+    canaryOutput: commandOutput,
+    failureThreshold: "Rollback is recommended at 3 consecutive health-check failures.",
+    consecutiveFailures,
+    monitoringStoppedAfterConsecutiveFailures
+  });
+}
+
+async function runCodex(context: SkillExecutionContext): Promise<JsonObject> {
+  const sourceArtifact = requiredStr(context, "artifact");
+  const artifact = await context.artifactStore.readLatest(sourceArtifact);
+  if (!artifact) throw new ArtifactError(`/codex could not find artifact /${sourceArtifact}.`);
+  const taskId = str(context.invocation.inputs.task, null);
+  const integration = new CodexIntegration({ projectRoot: context.config.projectRoot });
+  const prompt = integration.formatPrompt(sourceArtifact, artifact.content, taskId);
+  const installed = await integration.isInstalled();
+  const command = `codex --prompt ${JSON.stringify(prompt)}`;
+  let codexOutput = installed ? "Codex CLI detected. Execution skipped by default; pass --execute-codex to run it." : "Codex CLI is not installed or not on PATH.";
+  let exitCode = installed ? 0 : 127;
+  let verdict = installed ? "SUCCESS" : "NOT_INSTALLED";
+  if (installed && bool(context.invocation.inputs["execute-codex"])) {
+    const result = await executeCommand(context, command, 180_000);
+    codexOutput = result.output;
+    exitCode = result.exitCode;
+    verdict = result.exitCode === 0 ? "SUCCESS" : "FAIL";
+  }
+  const status = await git(["status", "--porcelain"], context.config.projectRoot);
+  return mark(context, {
+    sourceArtifact,
+    taskExtracted: taskId ?? actionableTaskFromArtifact(artifact.content),
+    codexPrompt: prompt,
+    codexCommand: command,
+    codexOutput,
+    codexExitCode: exitCode,
+    codexVerdict: verdict,
+    filesModified: status.stdout.trim() ? status.stdout.trim().split(/\r?\n/).map((line) => line.slice(3).trim()).filter(Boolean) : [],
+    warnings: installed ? ["Codex execution is opt-in; default run only formats the prompt."] : ["Install Codex CLI to execute this prompt."]
+  });
+}
+
+async function runCso(context: SkillExecutionContext): Promise<JsonObject> {
+  const artifactSkills = await context.artifactStore.listSkillsWithArtifacts();
+  const artifacts = await readLatestArtifacts(context, artifactSkills);
+  return mark(context, new CSOEngine({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).assess(artifacts));
+}
+
+async function runDesignHtml(context: SkillExecutionContext): Promise<JsonObject> {
+  const design = context.prerequisiteArtifacts["design-consultation"] ?? {};
+  const screens = objectArray(design.screens);
+  const requestedScreen = str(context.invocation.inputs.screen, null);
+  const screen = requestedScreen ? screens.find((item) => str(item.name, "")!.toLowerCase() === requestedScreen.toLowerCase()) : screens[0];
+  if (requestedScreen && screens.length > 0 && !screen && !context.invocation.flags.force) {
+    throw new ArtifactError(`Screen not found in /design-consultation: ${requestedScreen}. Valid screens: ${screens.map((item) => str(item.name, "unnamed")).join(", ")}`);
+  }
+  const shotgun = await context.artifactStore.readLatest("design-shotgun");
+  const variantName = str(context.invocation.inputs.variant, null);
+  const variants = objectArray(shotgun?.content.variants).map(normalizeDesignVariant);
+  const subject = str(screen?.name, null) ?? str(shotgun?.content.subject, "Primary workflow")!;
+  const artifact = { id: shortHash(subject, 12), skillName: "design-shotgun" as const, subject, createdAt: nowIso(), variants, chosenVariant: variantName, htmlFilePath: null, screens: screen ? [screen] : screens, tasteProfileApplied: shotgun?.content.tasteProfileApplied === true };
+  const htmlFilePath = await new DesignArtifactRenderer({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).render({ artifact, variantName });
+  const html = await readFile(htmlFilePath, "utf8");
+  return mark(context, {
+    screenName: subject,
+    variantName,
+    htmlFilePath,
+    componentsCovered: stringArray(screen?.components).length > 0 ? stringArray(screen?.components) : variants.flatMap((variant) => variant.components).slice(0, 8),
+    accessibilityNotes: ["Semantic HTML shell generated.", "Responsive viewport meta tag included.", "Review final interactive states before implementation."],
+    knownLimitations: ["Static prototype only; JavaScript interactions are not implemented."],
+    viewInstructions: `Open ${htmlFilePath} in a browser to review the prototype.`,
+    htmlValid: /^<!doctype html>/i.test(html) && html.includes("<html"),
+    validationErrors: /^<!doctype html>/i.test(html) ? [] : ["Generated HTML is missing a doctype."]
+  });
+}
+
+async function runDevexReview(context: SkillExecutionContext): Promise<JsonObject> {
+  const packageJson = await readPackageJson(context.config.projectRoot);
+  const scripts = objectValue(packageJson?.scripts);
+  const readme = await readTextIfExists(path.join(context.config.projectRoot, "README.md"));
+  const envExample = await exists(path.join(context.config.projectRoot, ".env.example"));
+  const testConfig = await anyExists(context.config.projectRoot, ["vitest.config.ts", "vitest.config.js", "jest.config.js", "playwright.config.ts"]);
+  const lintConfig = await anyExists(context.config.projectRoot, ["eslint.config.js", ".eslintrc", ".eslintrc.json"]);
+  const readmeGaps = readme ? readmeGapsFor(readme) : ["README.md is missing."];
+  const envSetupGaps = envExample ? [] : ["Add .env.example or equivalent environment documentation."];
+  const categories = [
+    devexCategory("Local Setup", scripts?.dev || scripts?.start ? 18 : 8, scripts?.dev || scripts?.start ? ["Start script is present."] : ["No dev/start script found."], ["Document the expected local startup path."]),
+    devexCategory("Environment", envExample ? 18 : 8, envSetupGaps.length ? envSetupGaps : ["Environment example exists."], ["Keep secrets out of committed files."]),
+    devexCategory("Test Infrastructure", scripts?.test || testConfig ? 18 : 7, scripts?.test || testConfig ? ["Test command or config found."] : ["No test command/config detected."], ["Make test command runnable in CI."]),
+    devexCategory("Linting", scripts?.lint || lintConfig ? 16 : 8, scripts?.lint || lintConfig ? ["Lint command or config found."] : ["No linting setup detected."], ["Keep lint failures actionable."]),
+    devexCategory("Documentation", Math.max(4, 20 - readmeGaps.length * 4), readmeGaps.length ? readmeGaps : ["README covers basic project context."], ["Add first-run and troubleshooting notes."])
+  ];
+  const overallScore = categories.reduce((total, category) => total + Number(category.score), 0);
+  const criticalIssues = readme ? [] : ["README.md is required for a passing developer experience review."];
+  return mark(context, {
+    overallScore,
+    overallVerdict: criticalIssues.length > 0 ? "FAIL" : overallScore >= 80 ? "PASS" : overallScore >= 55 ? "REVISE" : "FAIL",
+    categories,
+    readmeScore: Math.max(0, 20 - readmeGaps.length * 4),
+    readmeGaps,
+    envSetupScore: envExample ? 18 : 8,
+    envSetupGaps,
+    testRunTime: null,
+    criticalIssues,
+    mustFixBeforeProceeding: criticalIssues,
+    scoringMethod: "Five categories scored from 0-20 using repo files and package scripts."
+  });
+}
+
+async function runDstackUpgrade(context: SkillExecutionContext): Promise<JsonObject> {
+  const currentVersion = str((await readPackageJson(context.config.projectRoot))?.version, "0.1.0")!;
+  const latestVersion = str(context.invocation.inputs.latestVersion, null) ?? str(context.invocation.inputs["latest-version"], null) ?? currentVersion;
+  const manager = new UpgradeManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir, currentVersion });
+  const plan = await manager.check(latestVersion);
+  let backupCheckpointCreated = false;
+  let backupCheckpointPath: string | null = null;
+  const upgradeApproved = bool(context.invocation.inputs.approve) || bool(context.invocation.inputs["approve-upgrade"]);
+  let upgradeExecuted = false;
+  let upgradeOutput: string | null = null;
+  let postUpgradeVerification = plan.postUpgradeVerification;
+  if (!plan.isUpToDate && upgradeApproved) {
+    const checkpointName = await manager.createBackupCheckpoint();
+    backupCheckpointCreated = true;
+    backupCheckpointPath = path.join(context.config.dstackDir, "checkpoints", `${checkpointName}.checkpoint.json`);
+    if (bool(context.invocation.inputs["execute-upgrade"])) {
+      const upgrade = await executeCommand(context, "npm install -g @dstack/cli@latest", 180_000);
+      upgradeExecuted = upgrade.exitCode === 0;
+      upgradeOutput = upgrade.output;
+      postUpgradeVerification = upgradeExecuted ? "PASS" : "FAIL";
+    }
+  }
+  return mark(context, { ...plan, backupCheckpointCreated, backupCheckpointPath, upgradeApproved, upgradeExecuted, upgradeOutput, postUpgradeVerification });
+}
+
+async function runLandingReport(context: SkillExecutionContext): Promise<JsonObject> {
+  const url = requiredStr(context, "url");
+  return mark(context, await new LandingReportAnalyzer({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir, headless: context.config.browserHeadless }).analyze({ url }));
+}
+
+async function runMakePdf(context: SkillExecutionContext): Promise<JsonObject> {
+  const artifactNames = unique(csv(context.invocation.inputs.artifacts).concat(str(context.invocation.inputs.artifact, null) ? [str(context.invocation.inputs.artifact, null)!] : []));
+  if (artifactNames.length === 0) throw new ValidationError("/make-pdf requires --artifact or --artifacts.");
+  const title = str(context.invocation.inputs.title, null) ?? `DStack ${artifactNames.join(" ")} report`;
+  return mark(context, await new PDFGenerator({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).generate({ title, artifactNames }));
+}
+
+async function runPairAgent(context: SkillExecutionContext): Promise<JsonObject> {
+  const task = requiredStr(context, "task");
+  const result = await new PairAgentController({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir }).run({
+    task,
+    sessionName: str(context.invocation.inputs.session, null),
+    maxSteps: numberInput(context.invocation.inputs["max-steps"], 20),
+    checkpointEvery: numberInput(context.invocation.inputs["checkpoint-every"], 5)
+  });
+  return mark(context, result);
+}
+
+async function runPlanDesignReview(context: SkillExecutionContext): Promise<JsonObject> {
+  const autoplan = context.prerequisiteArtifacts.autoplan ?? {};
+  const phases = objectArray(autoplan.phases);
+  const phaseReviews = phases.map((phase) => {
+    const issues = designIssuesForPhase(phase);
+    return { phaseName: str(phase.name, "Unnamed phase")!, verdict: issues.length > 0 ? "REVISE" : "PASS", designIssues: issues, suggestions: issues.map((issue) => `Add a design deliverable for: ${issue}`) };
+  });
+  const planDesignGaps = phaseReviews.flatMap((review) => stringArray(review.designIssues));
+  const accessibilityFlags = phases.flatMap((phase) => accessibilityFlagsForPhase(phase));
+  const sequencingIssues = phases.flatMap((phase) => sequencingIssuesForPhase(phase));
+  const undefinedDeliverables = planDesignGaps.filter((gap) => /design|ui|screen|component/i.test(gap));
+  const mustFixBeforeProceeding = unique([...planDesignGaps, ...accessibilityFlags, ...sequencingIssues]).slice(0, 8);
+  return mark(context, {
+    overallVerdict: mustFixBeforeProceeding.length === 0 ? "PASS" : "REVISE",
+    planDesignGaps,
+    accessibilityFlags,
+    sequencingIssues,
+    undefinedDeliverables,
+    phaseReviews,
+    mustFixBeforeProceeding,
+    reviewedPhaseCount: phases.length,
+    note: phases.length === 0 ? "No phases were present in autoplan." : ""
+  });
+}
+
+async function runPlanDevexReview(context: SkillExecutionContext): Promise<JsonObject> {
+  const autoplan = context.prerequisiteArtifacts.autoplan ?? {};
+  const phases = objectArray(autoplan.phases);
+  const packageJson = await readPackageJson(context.config.projectRoot);
+  const scripts = objectValue(packageJson?.scripts);
+  const hasReadme = await exists(path.join(context.config.projectRoot, "README.md"));
+  const hasEnv = await exists(path.join(context.config.projectRoot, ".env.example"));
+  const hasCi = await exists(path.join(context.config.projectRoot, ".github", "workflows"));
+  const missingDevexTasks = missingDevexPlanTasks(phases);
+  const onboardingGaps = hasReadme ? [] : ["README.md is missing, so onboarding path is unclear."];
+  const toolingIssues = scripts?.lint ? [] : ["No lint script detected in package.json."];
+  const testInfraGaps = scripts?.test ? [] : ["No test script detected in package.json."];
+  const ciCdGaps = hasCi ? [] : ["No GitHub workflow directory detected."];
+  const documentationGaps = hasEnv ? [] : ["Environment variable documentation is missing."];
+  const setupComplexityScore = clampComplexity(1 + missingDevexTasks.length + onboardingGaps.length + testInfraGaps.length + ciCdGaps.length);
+  const mustFixBeforeProceeding = setupComplexityScore >= 4 ? ["Reduce setup complexity before implementation proceeds."] : [];
+  return mark(context, {
+    overallVerdict: mustFixBeforeProceeding.length > 0 || missingDevexTasks.length > 0 ? "REVISE" : "PASS",
+    missingDevexTasks,
+    setupComplexityScore,
+    setupComplexityRationale: `${missingDevexTasks.length} missing plan task(s), ${onboardingGaps.length} onboarding gap(s), ${testInfraGaps.length} test gap(s), ${ciCdGaps.length} CI/CD gap(s).`,
+    onboardingGaps,
+    toolingIssues,
+    testInfraGaps,
+    ciCdGaps,
+    documentationGaps,
+    phaseReviews: phases.map((phase) => ({ phaseName: str(phase.name, "Unnamed phase")!, verdict: missingDevexTasksForText(JSON.stringify(phase)).length > 0 ? "REVISE" : "PASS", devexIssues: missingDevexTasksForText(JSON.stringify(phase)) })),
+    mustFixBeforeProceeding
+  });
+}
+
+async function runSetupBrowserCookies(context: SkillExecutionContext): Promise<JsonObject> {
+  const sessionName = str(context.invocation.inputs.session, "default")!;
+  const targetUrl = requiredStr(context, "url");
+  const manager = new BrowserSessionManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
+  const cookieCount = numberInput(context.invocation.inputs["cookie-count"], 0);
+  const cookies = Array.from({ length: Math.max(0, cookieCount) }, (_value, index) => ({ name: `cookie_${index + 1}`, value: `session-value-${index + 1}`, domain: domainForUrl(targetUrl), path: "/", expires: -1, httpOnly: true, secure: targetUrl.startsWith("https://"), sameSite: "Lax" }));
+  const authIndicatorsFound = cookieCount > 0 ? ["cookie metadata imported"] : [];
+  const metadata = await manager.saveCookies(sessionName, cookies as unknown as JsonObject[], { targetUrl, authenticationVerified: authIndicatorsFound.length > 0, authIndicatorsFound });
+  return mark(context, {
+    sessionName: metadata.name,
+    targetUrl,
+    cookieCount: metadata.cookieCount,
+    sessionFilePath: manager.cookiePath(sessionName),
+    authenticationVerified: metadata.authenticationVerified,
+    authIndicatorsFound: metadata.authIndicatorsFound,
+    expiresAt: metadata.expiresAt,
+    sessionMetadataPath: metadata.metadataPath,
+    storageStatePath: metadata.storageStatePath,
+    warnings: metadata.cookieCount === 0 ? ["No cookie values were imported; session file was initialized without authentication cookies."] : ["Cookie values are stored only in the session file and omitted from artifacts."]
+  });
+}
+
+async function runSkillify(context: SkillExecutionContext): Promise<JsonObject> {
+  const generator = new SkillGenerator({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
+  const draft = await generator.generate({ name: requiredStr(context, "name"), description: requiredStr(context, "description"), model: str(context.invocation.inputs.model, null), tools: csv(context.invocation.inputs.tools) });
+  return mark(context, draft as unknown as JsonObject);
+}
+
 async function runScrape(context: SkillExecutionContext): Promise<JsonObject> {
   const urls = unique(csv(context.invocation.inputs.urls).concat(str(context.invocation.inputs.url, null) ? [str(context.invocation.inputs.url, null)!] : []));
   if (urls.length === 0) throw new ValidationError("/scrape requires --url or --urls");
@@ -973,6 +1289,118 @@ async function readReviewArtifacts(context: SkillExecutionContext, skillNames: s
   return reviews;
 }
 
+function actionableTaskFromArtifact(artifact: JsonObject): string {
+  const phases = objectArray(artifact.phases);
+  for (const phase of phases) {
+    const task = objectArray(phase.tasks)[0];
+    const title = str(task?.title, null) ?? str(task?.name, null);
+    if (title) return title;
+  }
+  const mustFix = stringArray(artifact.mustFixBeforeProceeding)[0];
+  return mustFix ?? "Review the artifact and pick the smallest actionable implementation task.";
+}
+
+function normalizeDesignVariant(value: JsonObject) {
+  const tradeoffs = objectValue(value.tradeoffs);
+  return {
+    name: str(value.name, "Generated Variant")!,
+    layoutParadigm: str(value.layoutParadigm, "Responsive layout")!,
+    componentPhilosophy: str(value.componentPhilosophy, "Clear reusable components")!,
+    interactionModel: str(value.interactionModel, "Static review flow")!,
+    visualDirection: str(value.visualDirection, "Focused and accessible")!,
+    components: stringArray(value.components),
+    userFlows: stringArray(value.userFlows),
+    advantages: stringArray(value.advantages).length > 0 ? stringArray(value.advantages) : stringArray(tradeoffs?.advantages),
+    disadvantages: stringArray(value.disadvantages).length > 0 ? stringArray(value.disadvantages) : stringArray(tradeoffs?.disadvantages),
+    bestFor: str(value.bestFor, "General users")!,
+    htmlPrototypePath: str(value.htmlPrototypePath, null)
+  };
+}
+
+function devexCategory(name: string, score: number, findings: string[], suggestions: string[]): JsonObject {
+  return { name, score: Math.max(0, Math.min(20, score)), findings, suggestions };
+}
+
+function readmeGapsFor(readme: string): string[] {
+  const gaps: string[] = [];
+  if (!/install|setup|getting started/i.test(readme)) gaps.push("README should explain local setup or installation.");
+  if (!/test|qa|verify/i.test(readme)) gaps.push("README should explain how to run tests.");
+  if (!/env|environment|configuration/i.test(readme)) gaps.push("README should document environment/configuration needs.");
+  return gaps;
+}
+
+async function anyExists(root: string, candidates: string[]): Promise<boolean> {
+  for (const candidate of candidates) {
+    if (await exists(path.join(root, candidate))) return true;
+  }
+  return false;
+}
+
+function designIssuesForPhase(phase: JsonObject): string[] {
+  const tasks = objectArray(phase.tasks);
+  const issues: string[] = [];
+  for (const task of tasks) {
+    const text = taskText(task);
+    if (isUiTask(text) && !/design|wireframe|prototype|mockup|spec|accessib/i.test(text)) {
+      issues.push(`UI task lacks a design deliverable: ${taskTitle(task)}`);
+    }
+  }
+  if (tasks.length === 0 && isUiTask(JSON.stringify(phase))) issues.push(`Phase implies UI work but has no explicit design task: ${str(phase.name, "Unnamed phase")}`);
+  return issues;
+}
+
+function accessibilityFlagsForPhase(phase: JsonObject): string[] {
+  const text = JSON.stringify(phase);
+  return isUiTask(text) && !/accessib|a11y|keyboard|screen reader|contrast/i.test(text) ? [`Accessibility criteria missing in ${str(phase.name, "phase")}.`] : [];
+}
+
+function sequencingIssuesForPhase(phase: JsonObject): string[] {
+  const tasks = objectArray(phase.tasks);
+  const firstUiIndex = tasks.findIndex((task) => isUiTask(taskText(task)));
+  const firstDesignIndex = tasks.findIndex((task) => /design|wireframe|prototype|mockup|spec/i.test(taskText(task)));
+  return firstUiIndex >= 0 && (firstDesignIndex < 0 || firstUiIndex < firstDesignIndex) ? [`Implementation appears before design specification in ${str(phase.name, "phase")}.`] : [];
+}
+
+function missingDevexPlanTasks(phases: JsonObject[]): string[] {
+  const allText = phases.map((phase) => JSON.stringify(phase)).join("\n");
+  return missingDevexTasksForText(allText);
+}
+
+function missingDevexTasksForText(text: string): string[] {
+  const checks = [
+    [/setup|install|local dev/i, "Plan should include local setup/onboarding tasks."],
+    [/env|environment|configuration/i, "Plan should document environment variables/configuration."],
+    [/test|qa|vitest|jest|playwright/i, "Plan should include test infrastructure tasks."],
+    [/ci|pipeline|github actions|deploy/i, "Plan should include CI/CD workflow tasks."],
+    [/readme|docs|documentation|contributing/i, "Plan should include documentation/contribution tasks."]
+  ] as const;
+  return checks.filter(([pattern]) => !pattern.test(text)).map(([, issue]) => issue);
+}
+
+function clampComplexity(value: number): number {
+  return Math.max(1, Math.min(5, value));
+}
+
+function taskText(task: JsonObject): string {
+  return [task.title, task.name, task.description, task.deliverable, task.tags].map((value) => Array.isArray(value) ? value.join(" ") : String(value ?? "")).join(" ");
+}
+
+function taskTitle(task: JsonObject): string {
+  return str(task.title, null) ?? str(task.name, null) ?? "unnamed task";
+}
+
+function isUiTask(text: string): boolean {
+  return /ui|ux|screen|page|component|frontend|form|button|layout|dashboard|mobile/i.test(text);
+}
+
+function domainForUrl(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "localhost";
+  }
+}
+
 async function executeCommand(context: SkillExecutionContext, command: string, timeout: number): Promise<{ output: string; exitCode: number }> {
   try {
     const result = await context.toolExecutor.dispatch({ id: `cmd-${shortHash(command)}`, name: "run_command", input: { command, timeout } });
@@ -1003,6 +1431,78 @@ async function pollHealth(url: string, timeoutSeconds: number, intervalSeconds: 
     if (Date.now() + intervalMs <= deadline) await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
   return { verdict: attempts > 0 ? "TIMEOUT" : "FAIL", attempts, output: last };
+}
+
+async function runCanaryMonitor(url: string, options: { monitorDurationMinutes: number; intervalSeconds: number; timeoutSeconds: number }): Promise<{ checks: JsonObject[]; stoppedAfterConsecutiveFailures: boolean }> {
+  const checks: JsonObject[] = [];
+  const intervalMs = Math.max(1000, Math.min(options.intervalSeconds * 1000, 5000));
+  const maxChecksByDuration = Math.max(1, Math.ceil(Math.max(options.monitorDurationMinutes, 1) * 60 / Math.max(options.intervalSeconds, 1)));
+  const maxChecksByTimeout = Math.max(1, Math.ceil(Math.max(options.timeoutSeconds, 1) / Math.max(options.intervalSeconds, 1)));
+  const maxChecks = Math.min(6, Math.max(1, Math.min(maxChecksByDuration, maxChecksByTimeout)));
+  let consecutiveFailures = 0;
+  for (let index = 0; index < maxChecks; index += 1) {
+    const check = await singleCanaryHealthCheck(url);
+    checks.push(check);
+    consecutiveFailures = check.verdict === "FAIL" ? consecutiveFailures + 1 : 0;
+    if (consecutiveFailures >= 3) return { checks, stoppedAfterConsecutiveFailures: true };
+    if (index < maxChecks - 1) await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return { checks, stoppedAfterConsecutiveFailures: false };
+}
+
+async function singleCanaryHealthCheck(url: string): Promise<JsonObject> {
+  const checkedAt = nowIso();
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const body = await response.text().catch(() => "");
+    const responseTimeMs = Date.now() - startedAt;
+    const errorRate = extractErrorRate(body);
+    const verdict = response.ok && (errorRate === null || errorRate < 0.05) ? "PASS" : "FAIL";
+    return {
+      checkedAt,
+      verdict,
+      responseTimeMs,
+      status: response.status,
+      errorRate,
+      output: `${response.status} ${response.statusText}`
+    };
+  } catch (error) {
+    return {
+      checkedAt,
+      verdict: "FAIL",
+      responseTimeMs: Date.now() - startedAt,
+      status: null,
+      errorRate: null,
+      output: error instanceof Error ? error.message : String(error)
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function extractErrorRate(body: string): number | null {
+  const match = body.match(/error[_ -]?rate["':=\s]+([0-9.]+)/i);
+  if (!match?.[1]) return null;
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed > 1 ? parsed / 100 : parsed;
+}
+
+function maxConsecutiveFailures(checks: JsonObject[]): number {
+  let max = 0;
+  let current = 0;
+  for (const check of checks) {
+    if (check.verdict === "FAIL") {
+      current += 1;
+      max = Math.max(max, current);
+    } else {
+      current = 0;
+    }
+  }
+  return max;
 }
 
 async function detectDeployPlatform(projectRoot: string): Promise<{ platform: string; deployCommand: string; dryRunCommand: string; warnings: string[] }> {

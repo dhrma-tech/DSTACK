@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("plan-devex-review");
+import { planDevexReviewHandler } from "../../../phase2-real-handlers.js";
+export default planDevexReviewHandler;

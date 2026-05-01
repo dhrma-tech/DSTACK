@@ -29,8 +29,12 @@ export class CodexIntegration {
   constructor(private readonly options: CodexIntegrationOptions) {}
 
   async isInstalled(): Promise<boolean> {
-    const result = await execFileAsync("codex", ["--version"], { cwd: this.options.projectRoot, windowsHide: true }).then(() => true).catch(() => false);
-    return result;
+    try {
+      await execFileAsync("codex", ["--version"], { cwd: this.options.projectRoot, windowsHide: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   formatPrompt(sourceArtifact: string, artifact: JsonObject, taskId: string | null): string {

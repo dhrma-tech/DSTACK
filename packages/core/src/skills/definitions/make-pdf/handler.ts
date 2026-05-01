@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("make-pdf");
+import { makePdfHandler } from "../../../phase2-real-handlers.js";
+export default makePdfHandler;

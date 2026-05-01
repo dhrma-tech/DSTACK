@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("plan-design-review");
+import { planDesignReviewHandler } from "../../../phase2-real-handlers.js";
+export default planDesignReviewHandler;

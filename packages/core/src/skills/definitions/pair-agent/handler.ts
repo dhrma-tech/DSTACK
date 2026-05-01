@@ -1,2 +1,2 @@
-import { phase2SkillHandler } from "../../../phase2-skills.js";
-export default phase2SkillHandler("pair-agent");
+import { pairAgentHandler } from "../../../phase2-real-handlers.js";
+export default pairAgentHandler;

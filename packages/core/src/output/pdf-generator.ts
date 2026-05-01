@@ -29,35 +29,95 @@ export class PDFGenerator {
   async generate(request: PDFGenerationRequest): Promise<PDFGenerationResult> {
     const artifacts = new ArtifactStore(this.options.dstackDir);
     const included: string[] = [];
+    const summaries: Array<{ name: string; summary: string }> = [];
     for (const name of request.artifactNames) {
-      if (await artifacts.readLatest(name)) included.push(name);
+      const artifact = await artifacts.readLatest(name);
+      if (artifact) {
+        included.push(name);
+        summaries.push({ name, summary: summarizeArtifact(artifact.content) });
+      }
     }
     const title = request.title || included.join("-") || "dstack-report";
     const pdfPath = path.join(this.options.dstackDir, "exports", `${safeName(title)}-${fileSafeTimestamp()}.pdf`);
     await ensureDir(path.dirname(pdfPath));
-    const pdf = minimalPdf(title, included);
+    const pages = [
+      [`DStack Report: ${title}`, `Generated: ${new Date().toISOString()}`, `Artifacts: ${included.join(", ") || "none"}`],
+      ...summaries.map((item) => [item.name, item.summary])
+    ];
+    const pdf = minimalPdf(pages);
     await writeFile(pdfPath, pdf, "binary");
-    return { title, artifactsIncluded: included, pageCount: Math.max(1, included.length), pdfPath, fileSizeKb: Math.ceil(Buffer.byteLength(pdf, "binary") / 1024), generatedAt: new Date().toISOString() };
+    return { title, artifactsIncluded: included, pageCount: pages.length, pdfPath, fileSizeKb: Math.ceil(Buffer.byteLength(pdf, "binary") / 1024), generatedAt: new Date().toISOString() };
   }
 }
 
-function minimalPdf(title: string, artifacts: string[]): string {
-  const text = `DStack Report: ${title} (${artifacts.join(", ") || "no artifacts"})`.replace(/[()\\]/g, "");
-  return `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
-4 0 obj << /Length ${text.length + 44} >> stream
-BT /F1 18 Tf 72 720 Td (${text}) Tj ET
-endstream endobj
-5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-xref
-0 6
-0000000000 65535 f 
-trailer << /Root 1 0 R /Size 6 >>
-startxref
-0
-%%EOF`;
+function minimalPdf(pages: string[][]): string {
+  const safePages = pages.length > 0 ? pages : [["DStack Report", "No artifacts were available."]];
+  const fontObjectId = 3 + safePages.length * 2;
+  const kids = safePages.map((_page, index) => `${3 + index * 2} 0 R`).join(" ");
+  const objects: string[] = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${kids}] /Count ${safePages.length} >>`
+  ];
+  for (const [index, pageLines] of safePages.entries()) {
+    const pageObjectId = 3 + index * 2;
+    const contentObjectId = pageObjectId + 1;
+    const content = pageContent(pageLines);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentObjectId} 0 R /Resources << /Font << /F1 ${fontObjectId} 0 R >> >> >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(content, "binary")} >> stream\n${content}\nendstream`);
+  }
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(body, "binary"));
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xrefStart = Buffer.byteLength(body, "binary");
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) body += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  body += `trailer << /Root 1 0 R /Size ${objects.length + 1} >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return body;
+}
+
+function pageContent(lines: string[]): string {
+  const escaped = lines.flatMap((line) => wrapText(line, 84)).slice(0, 34).map(escapePdfText);
+  const commands = ["BT", "/F1 12 Tf", "72 720 Td"];
+  escaped.forEach((line, index) => {
+    if (index > 0) commands.push("0 -18 Td");
+    commands.push(`(${line}) Tj`);
+  });
+  commands.push("ET");
+  return commands.join("\n");
+}
+
+function summarizeArtifact(value: JsonObject): string {
+  const candidate = typeof value.summary === "string" ? value.summary
+    : typeof value.overallVerdict === "string" ? `Verdict: ${value.overallVerdict}`
+      : typeof value.healthVerdict === "string" ? `Health: ${value.healthVerdict}`
+        : typeof value.deployVerdict === "string" ? `Deploy: ${value.deployVerdict}`
+          : JSON.stringify(value);
+  return candidate.slice(0, 1400);
+}
+
+function wrapText(value: string, width: number): string[] {
+  const words = value.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > width && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [""];
+}
+
+function escapePdfText(value: string): string {
+  return value.replace(/[^\x20-\x7E]/g, " ").replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
 }
 
 function safeName(value: string): string {

@@ -143,6 +143,7 @@ async function searchFiles(projectRoot: string, pattern: string): Promise<Array<
 function browserTools(): ToolHandler[] {
   const contexts = new Map<string, BrowserContext>();
   const pages = new Map<string, Page>();
+  const sessionByDir = new Map<string, string>();
   let activeSession = "default";
   const logs: JsonObject[] = [];
   const open = async (toolContext: ToolContext, sessionName = activeSession): Promise<Page> => {
@@ -152,10 +153,13 @@ function browserTools(): ToolHandler[] {
     if (!contexts.has(sessionDir)) {
       await ensureDir(sessionDir);
       const browserContext = await chromium.launchPersistentContext(sessionDir, { headless: toolContext.config.browserHeadless });
+      const cookies = (await manager.loadCookies(sessionName)).filter(hasCookieValue);
+      if (cookies.length > 0) await browserContext.addCookies(cookies as unknown as Parameters<BrowserContext["addCookies"]>[0]).catch(() => undefined);
       const browserPage = browserContext.pages()[0] ?? await browserContext.newPage();
       browserPage.on("console", (message) => logs.push({ session: sessionName, type: message.type(), text: message.text() }));
       browserPage.on("response", (response) => { if (response.status() >= 400) logs.push({ session: sessionName, url: response.url(), status: response.status(), method: response.request().method() }); });
       contexts.set(sessionDir, browserContext);
+      sessionByDir.set(sessionDir, sessionName);
       pages.set(sessionDir, browserPage);
     }
     return pages.get(sessionDir)!;
@@ -167,10 +171,18 @@ function browserTools(): ToolHandler[] {
     tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true, session: activeSession }; }),
     tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.locator(stringInput(input.ref, "ref")).first().fill(stringInput(input.text, "text")); return { success: true, session: activeSession }; }),
     tool("browser_get_logs", "Get browser logs.", "read", {}, async () => ({ consoleLogs: logs, networkLogs: logs })),
-    tool("browser_close", "Close browser.", "execute", {}, async () => {
-      await Promise.all([...contexts.values()].map((browserContext) => browserContext.close()));
+    tool("browser_close", "Close browser.", "execute", {}, async (_input, contextArg) => {
+      const manager = new BrowserSessionManager({ projectRoot: contextArg.projectRoot, dstackDir: contextArg.config.dstackDir });
+      for (const [sessionDir, browserContext] of contexts.entries()) {
+        const sessionName = sessionByDir.get(sessionDir) ?? "default";
+        const cookies = await browserContext.cookies().catch(() => []);
+        await manager.saveCookies(sessionName, cookies as unknown as JsonObject[]).catch(() => undefined);
+        await manager.saveStorageState(sessionName, await browserContext.storageState() as unknown as JsonObject).catch(() => undefined);
+        await browserContext.close();
+      }
       contexts.clear();
       pages.clear();
+      sessionByDir.clear();
       activeSession = "default";
       return { success: true };
     })
@@ -180,6 +192,10 @@ function browserTools(): ToolHandler[] {
 function stringInput(value: unknown, name: string): string {
   if (typeof value !== "string") throw new ToolError(`Expected string input: ${name}`);
   return value;
+}
+
+function hasCookieValue(cookie: JsonObject): boolean {
+  return typeof cookie.name === "string" && typeof cookie.value === "string" && (typeof cookie.url === "string" || typeof cookie.domain === "string");
 }
 
 async function sanitizeToolResult(result: ToolResult, toolName: string, logger: SessionLogger | null): Promise<ToolResult> {
