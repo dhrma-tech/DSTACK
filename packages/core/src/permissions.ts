@@ -18,7 +18,7 @@ const destructive = [
   /\bxargs\b/i,
   /\b(bash|sh)\s+-c\b/i
 ];
-const approved = [/^npm\s+run\b/i, /^yarn\b/i, /^pnpm\b/i, /^npx\s+(vitest|jest|tsc)\b/i, /^git\s+(status|diff|log)\b/i, /^(ls|dir|cat|type|echo)\b/i, /^node\s+-e\b/i];
+const approved = [/^npm\s+run\b/i, /^yarn\b/i, /^pnpm\b/i, /^npx\s+(vitest|jest|tsc)\b/i, /^git\s+(status|diff|log)\b/i, /^(ls|dir|echo)\b/i];
 
 export class PermissionGate {
   constructor(private readonly options: { interactive: boolean; dstackDir?: string | null }) {}
@@ -49,6 +49,8 @@ function decisionFor(toolCall: ToolCall): PermissionDecision {
   if (toolCall.name === "run_command") {
     const command = String(toolCall.input.command ?? "");
     if (destructive.some((pattern) => pattern.test(command))) return "DENY";
+    // Deny reading .env files via shell commands
+    if (/\b(cat|type)\s+.*\.env(\..*)?(\s|$)/i.test(command)) return "DENY";
     if (/\bgit\s+(push|rebase|merge|tag)\b/i.test(command)) return "REQUIRE_APPROVAL";
     if (approved.some((pattern) => pattern.test(command.trim()))) return "ALLOW";
     return "REQUIRE_APPROVAL";

@@ -10,6 +10,8 @@ import { PermissionGate } from "./permissions.js";
 import { atomicWrite, ensureDir, exists, fileSafeTimestamp, git, resolveInsideRoot } from "./utils.js";
 import { scanDomContent } from "./browser/dom-scanner.js";
 import { BrowserSessionManager } from "./browser/session-manager.js";
+import { BrowserRefMapManager, type BrowserSnapshotRefMap } from "./browser/ref-map.js";
+import { generateBrowserSnapshot } from "./browser/snapshot.js";
 
 const execAsync = promisify(exec);
 
@@ -152,6 +154,7 @@ function browserTools(): ToolHandler[] {
   const sessionByDir = new Map<string, string>();
   let activeSession = "default";
   const logs: JsonObject[] = [];
+  const refMapManager = new BrowserRefMapManager();
   const open = async (toolContext: ToolContext, sessionName = activeSession): Promise<Page> => {
     activeSession = sessionName;
     const manager = new BrowserSessionManager({ projectRoot: toolContext.projectRoot, dstackDir: toolContext.config.dstackDir });
@@ -194,10 +197,81 @@ function browserTools(): ToolHandler[] {
         throw error;
       }
     }),
-    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const scan = scanDomContent(await p.locator("body").innerText().catch(() => "")); return { url: p.url(), title: await p.title(), text: scan.sanitized, ariaTree: "", timestamp: new Date().toISOString(), promptInjectionDetected: scan.detected, promptInjectionFragments: scan.fragments, session: activeSession }; }),
+    tool("browser_snapshot", "Capture browser snapshot.", "read", {}, async (input, contextArg) => { 
+  const sessionName = typeof input.session === "string" ? input.session : activeSession;
+  const p = await open(contextArg, sessionName); 
+  const refMap = await generateBrowserSnapshot(p, sessionName);
+  refMapManager.setRefMap(sessionName, refMap);
+  return refMap; 
+}),
     tool("browser_screenshot", "Save a screenshot.", "write", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); const filePath = path.join(contextArg.config.dstackDir, "browser", "screenshots", `browser-${typeof input.label === "string" ? input.label : "snapshot"}-${fileSafeTimestamp()}.png`); await ensureDir(path.dirname(filePath)); await p.screenshot({ path: filePath, fullPage: true }); return { path: filePath, session: activeSession }; }),
-    tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.getByText(stringInput(input.ref, "ref")).first().click(); return { success: true, elementFound: true, session: activeSession }; }),
-    tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { const p = await open(contextArg, typeof input.session === "string" ? input.session : activeSession); await p.locator(stringInput(input.ref, "ref")).first().fill(stringInput(input.text, "text")); return { success: true, session: activeSession }; }),
+    tool("browser_click", "Click an element.", "execute", {}, async (input, contextArg) => { 
+  const sessionName = typeof input.session === "string" ? input.session : activeSession;
+  const p = await open(contextArg, sessionName); 
+  const ref = stringInput(input.ref, "ref");
+  
+  // Resolve ref using ref map
+  const resolvedRef = refMapManager.resolveRef(sessionName, ref);
+  if (!resolvedRef) {
+    if (ref.startsWith("@e")) {
+      throw new ToolError(`Ref ${ref} is stale. Run browser_snapshot again.`);
+    }
+    // Fallback to original behavior for non-@e refs
+    await p.getByText(ref).first().click();
+    return { success: true, elementFound: true, session: activeSession };
+  }
+  
+  // Use resolved ref
+  let element;
+  if (resolvedRef.source === "testid") {
+    element = p.locator(resolvedRef.selectorHint);
+  } else if (resolvedRef.source === "role") {
+    element = p.locator(resolvedRef.selectorHint).filter({ hasText: resolvedRef.name });
+  } else if (resolvedRef.source === "text") {
+    element = p.getByText(resolvedRef.name);
+  } else {
+    element = p.locator(resolvedRef.selectorHint);
+  }
+  
+  await element.first().click();
+  return { success: true, elementFound: true, session: activeSession, clickedRef: resolvedRef.ref }; 
+}),
+    tool("browser_type", "Type into an element.", "execute", {}, async (input, contextArg) => { 
+  const sessionName = typeof input.session === "string" ? input.session : activeSession;
+  const p = await open(contextArg, sessionName); 
+  const ref = stringInput(input.ref, "ref");
+  const text = stringInput(input.text, "text");
+  
+  // Resolve ref using ref map
+  const resolvedRef = refMapManager.resolveRef(sessionName, ref);
+  if (!resolvedRef) {
+    if (ref.startsWith("@e")) {
+      throw new ToolError(`Ref ${ref} is stale. Run browser_snapshot again.`);
+    }
+    // Fallback to original behavior for non-@e refs
+    await p.locator(ref).first().fill(text);
+    return { success: true, session: activeSession };
+  }
+  
+  // Use resolved ref - ensure it's a text input element
+  if (!resolvedRef.role.includes("textbox") && !resolvedRef.role.includes("input") && !resolvedRef.role.includes("textarea")) {
+    throw new ToolError(`Ref ${ref} (${resolvedRef.role}) is not a text input element`);
+  }
+  
+  let element;
+  if (resolvedRef.source === "testid") {
+    element = p.locator(resolvedRef.selectorHint);
+  } else if (resolvedRef.source === "role") {
+    element = p.locator(resolvedRef.selectorHint).filter({ hasText: resolvedRef.name });
+  } else if (resolvedRef.source === "text") {
+    element = p.getByText(resolvedRef.name);
+  } else {
+    element = p.locator(resolvedRef.selectorHint);
+  }
+  
+  await element.first().fill(text);
+  return { success: true, session: activeSession, typedRef: resolvedRef.ref }; 
+}),
     tool("browser_get_logs", "Get browser logs.", "read", {}, async () => ({ consoleLogs: logs, networkLogs: logs })),
     tool("browser_close", "Close browser.", "execute", {}, async (_input, contextArg) => {
       const manager = new BrowserSessionManager({ projectRoot: contextArg.projectRoot, dstackDir: contextArg.config.dstackDir });
