@@ -47,7 +47,12 @@ export const setupDeployHandler = directPhase2Handler(runSetupDeploy);
 export const landAndDeployHandler = directPhase2Handler(runLandAndDeploy);
 export const scrapeHandler = directPhase2Handler(runScrape);
 export const healthHandler = directPhase2Handler(runHealth);
-export const retroHandler = directPhase2Handler(runRetro);
+export const retroHandler: SkillHandler = {
+  ...directPhase2Handler(runRetro),
+  async postSave(output, context) {
+    await storeRetroLearnings(output, context);
+  }
+};
 export const guardHandler = directPhase2Handler(runGuard);
 export const carefulHandler = directPhase2Handler(runCareful);
 export const learnHandler = directPhase2Handler(runLearn);
@@ -396,16 +401,6 @@ async function runRetro(context: SkillExecutionContext): Promise<JsonObject> {
   const cycleEnd = str(ship?.generatedAt, null) ?? nowIso();
   const learningEntries = retroLearningEntries(repeatedIssues, qaFailures, reviewRejections);
   const storeLearnings = !bool(context.invocation.inputs["suggest-only"]);
-  if (storeLearnings) {
-    const store = new LearningStore({ dstackDir: context.config.dstackDir });
-    const existing = await store.all();
-    for (const entry of learningEntries) {
-      if (!hasDuplicateLearning(existing, entry.topic, entry.insight)) {
-        const stored = await store.add({ ...entry, originalText: entry.insight, wasRephrased: false, source: "retro" });
-        existing.push(stored);
-      }
-    }
-  }
   const output = mark(context, {
     cycleStart,
     cycleEnd,
@@ -423,6 +418,26 @@ async function runRetro(context: SkillExecutionContext): Promise<JsonObject> {
     gitLog: await gitSummary(context.config.projectRoot)
   });
   return output;
+}
+
+async function storeRetroLearnings(output: JsonObject, context: SkillExecutionContext): Promise<void> {
+  if (!bool(output.learningSuggestionsStored)) return;
+  const store = new LearningStore({ dstackDir: context.config.dstackDir });
+  const existing = await store.all();
+  for (const rawEntry of objectArray(output.learningEntries)) {
+    const topic = str(rawEntry.topic, null);
+    const insight = str(rawEntry.insight, null);
+    if (!topic || !insight || hasDuplicateLearning(existing, topic, insight)) continue;
+    const stored = await store.add({
+      topic,
+      insight,
+      originalText: insight,
+      wasRephrased: false,
+      appliesTo: stringArray(rawEntry.appliesTo),
+      source: "retro"
+    });
+    existing.push(stored);
+  }
 }
 
 async function runGuard(context: SkillExecutionContext): Promise<JsonObject> {

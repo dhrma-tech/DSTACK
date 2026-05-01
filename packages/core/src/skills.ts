@@ -26,6 +26,7 @@ export interface SkillExecutionContext {
 export interface SkillHandler {
   buildContext(context: SkillExecutionContext): Promise<JsonObject>;
   postProcess(rawOutput: string, context: SkillExecutionContext): Promise<JsonObject>;
+  postSave?(output: JsonObject, context: SkillExecutionContext, artifactPath: string): Promise<void>;
   run?(context: SkillExecutionContext): Promise<SkillRunResult>;
 }
 
@@ -96,6 +97,9 @@ export class SkillExecutor {
       if (handler.run) {
         const direct = await handler.run(context);
         if (direct.output) validateOutputSchema(manifest, direct.output);
+        if (direct.output && direct.artifactPath && handler.postSave) {
+          await handler.postSave(direct.output, context, direct.artifactPath);
+        }
         await session.complete("complete");
         return direct;
       }
@@ -124,6 +128,9 @@ export class SkillExecutor {
       validateOutputSchema(manifest, output);
       if (manifest.name === "office-hours") await this.memory.seedFromOfficeHours(output);
       const artifact = invocation.flags.dryRun ? null : await this.artifacts.write(manifest.name, output);
+      if (artifact && handler.postSave) {
+        await handler.postSave(output, context, artifact.filePath);
+      }
       const verdict = extractVerdict(output);
       const result: SkillRunResult = { skillName: manifest.name, status: "complete", verdict, artifactPath: artifact?.filePath ?? null, output, nextSkill: verdict === "FAIL" && manifest.name === "qa" ? "investigate" : manifest.nextSkill, warnings: invocation.flags.force ? ["Stage gates bypassed with --force."] : [] };
       await session.complete("complete");

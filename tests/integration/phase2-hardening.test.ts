@@ -366,6 +366,30 @@ describe("Phase 2 hardening pass", () => {
     }
   });
 
+  it("retro stores learning suggestions only after an artifact is saved", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const config = await ConfigManager.load({ projectRoot: workspace.root });
+      const artifacts = new ArtifactStore(config.dstackDir);
+      await artifacts.write("office-hours", officeHoursOutput());
+      await artifacts.write("qa", qaOutput("FAIL"));
+      await artifacts.write("review", reviewOutput("FAIL"));
+      await artifacts.write("ship", shipOutput(true));
+      const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
+      const dryRun = await executor.run(invocation("/retro", workspace.root, {}, { dryRun: true }));
+      expect(dryRun.artifactPath).toBeNull();
+      expect(dryRun.output?.learningSuggestionsStored).toBe(true);
+      expect(await artifacts.readLatest("retro")).toBeNull();
+      expect(await new LearningStore({ dstackDir: config.dstackDir }).all()).toHaveLength(0);
+
+      const saved = await executor.run(invocation("/retro", workspace.root));
+      expect(saved.artifactPath).toEqual(expect.stringContaining("retro"));
+      expect((await new LearningStore({ dstackDir: config.dstackDir }).all()).length).toBeGreaterThan(0);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   it("runs final planning, devex, design, export, and utility Phase 2 handlers without the central shim", async () => {
     const workspace = await tempWorkspace();
     try {
