@@ -268,7 +268,7 @@ describe("Phase 2 hardening pass", () => {
       const exportBody = await readFile(exportPath, "utf8");
       expect(exportBody).toContain("| release | Always run qa before ship for release branches |");
 
-      const pruned = await executor.run(invocation("/learn", workspace.root, { prune: true, "older-than": 30 }));
+      const pruned = await executor.run(invocation("/learn", workspace.root, { prune: true, "older-than": "30" }));
       expect(Number(pruned.output?.entriesAffected)).toBeGreaterThanOrEqual(1);
       expect((await store.search("old"))).toHaveLength(0);
     } finally {
@@ -349,15 +349,16 @@ describe("Phase 2 hardening pass", () => {
     try {
       const config = await ConfigManager.load({ projectRoot: workspace.root });
       const artifacts = new ArtifactStore(config.dstackDir);
-      await artifacts.write("office-hours", officeHoursOutput());
+      await artifacts.write("office-hours", { ...officeHoursOutput(), generatedAt: "2026-01-01T00:00:00.000Z" });
       await artifacts.write("qa", qaOutput("FAIL"));
       await artifacts.write("review", reviewOutput("FAIL"));
-      await artifacts.write("ship", shipOutput(true));
+      await artifacts.write("ship", { ...shipOutput(true), generatedAt: "2026-01-04T00:00:00.000Z", deployedAt: "2026-01-04T00:00:00.000Z" });
       const executor = new SkillExecutor({ config, providerOverride: new FakeProvider(), interactive: false });
       const result = await executor.run(invocation("/retro", workspace.root));
       const metrics = result.output?.processMetrics as JsonObject;
       expect(metrics.qaFailures).toBe(1);
       expect(metrics.reviewRejections).toBeGreaterThan(0);
+      expect(result.output?.estimatedDurationDays).toBe(3);
       expect(JSON.stringify(result.output?.learningEntries)).toContain("QA recorded");
       expect((await new LearningStore({ dstackDir: config.dstackDir }).all()).length).toBeGreaterThan(0);
     } finally {

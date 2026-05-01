@@ -510,6 +510,21 @@ describe("Phase 2 modules", () => {
     }
   });
 
+  it("uses floating point weekly decay for design taste weights", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const store = new TasteProfileStore({ dstackDir: path.join(workspace.root, ".dstack") });
+      const referenceDate = new Date("2026-04-22T00:00:00.000Z");
+      await store.record({ variantName: "Current Choice", verdict: "approved", reason: "Recent preference", timestamp: "2026-04-22T00:00:00.000Z" });
+      await store.record({ variantName: "Three Week Old Choice", verdict: "approved", reason: "Older preference", timestamp: "2026-04-01T00:00:00.000Z" });
+      const weights = await store.getWeights(referenceDate);
+      expect(weights[0]?.variantName).toBe("Current Choice");
+      expect(weights.find((entry) => entry.variantName === "Three Week Old Choice")?.weight).toBeCloseTo(Math.pow(0.95, 3), 5);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   it("normalizes browser session cookies for Playwright reloads", async () => {
     const workspace = await tempWorkspace();
     try {
