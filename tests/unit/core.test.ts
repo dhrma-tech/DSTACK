@@ -82,7 +82,7 @@ describe("PermissionGate", () => {
 
   it("denies expanded Phase 2 command blocklist entries", async () => {
     const gate = new PermissionGate({ interactive: false });
-    for (const command of ["DROP TABLE users", "git push --force", "git push -f", "git reset --hard", "git clean -fd"]) {
+    for (const command of ["DROP TABLE users", "git push --force", "git push -f", "git push origin main --force-with-lease", "git reset --hard", "git clean -fd"]) {
       await expect(gate.check({ id: command, name: "run_command", input: { command } })).resolves.toBe("DENY");
     }
   });
@@ -125,6 +125,7 @@ describe("PermissionGate", () => {
       await new SafetyModeManager({ dstackDir }).setMode("GUARD", "guard");
       const gate = new PermissionGate({ interactive: false, dstackDir });
       await expect(gate.check({ id: "read", name: "read_file", input: { path: "README.md" } })).resolves.toBe("ALLOW");
+      await expect(gate.check({ id: "search", name: "search_files", input: { pattern: "TODO" } })).resolves.toBe("ALLOW");
       await expect(gate.check({ id: "write", name: "write_file", input: { path: "x.txt", content: "x" } })).resolves.toBe("DENY");
       await expect(gate.check({ id: "exec", name: "run_command", input: { command: "pnpm test" } })).resolves.toBe("DENY");
     } finally {

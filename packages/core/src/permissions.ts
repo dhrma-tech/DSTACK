@@ -7,7 +7,7 @@ const destructive = [
   /\brm\s+-rf\b/i,
   /\bsudo\b/i,
   /\bDROP\s+(TABLE|DATABASE)\b/i,
-  /\bgit\s+push\s+(--force|-f)\b/i,
+  /\bgit\s+push\b.*\s(--force|-f|--force-with-lease)(\s|$)/i,
   /\bgit\s+reset\s+--hard\b/i,
   /\bgit\s+clean\s+-f[dx]?\b/i,
   /\bcurl\b.*\|\s*(bash|sh)\b/i,
