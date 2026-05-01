@@ -28,6 +28,36 @@ export class DesignArtifactRenderer {
 function htmlFor(artifact: DesignArtifact, variantName: string | null): string {
   const title = escapeHtml(`${artifact.subject}${variantName ? ` - ${variantName}` : ""}`);
   const selected = variantName ? artifact.variants.find((variant) => variant.name === variantName) ?? artifact.variants[0] ?? null : artifact.variants[0] ?? null;
+  const selectedComponents = selected?.components.length ? selected.components : artifact.screens.flatMap((screen) => asStrings(screen.components));
+  const selectedFlows = selected?.userFlows.length ? selected.userFlows : artifact.screens.flatMap((screen) => asStrings(screen.userFlows));
+  const prototypeCanvas = `<section class="prototype-canvas" aria-labelledby="prototype-canvas-title">
+      <div class="canvas-header">
+        <div>
+          <p class="eyebrow">Interactive Shape</p>
+          <h2 id="prototype-canvas-title">Prototype Canvas</h2>
+          <p>${escapeHtml(selected?.bestFor ?? "A practical first implementation surface for the selected design direction.")}</p>
+        </div>
+        <a class="primary-action" href="#implementation-notes" aria-label="Jump to implementation notes">Implementation Notes</a>
+      </div>
+      <div class="canvas-grid">
+        <aside class="canvas-nav" aria-label="Prototype sections">
+          ${selectedComponents.slice(0, 6).map((component, index) => `<button type="button" class="${index === 0 ? "active" : ""}">${escapeHtml(component)}</button>`).join("") || "<button type=\"button\" class=\"active\">Overview</button>"}
+        </aside>
+        <div class="canvas-main">
+          <div class="status-strip" role="status">
+            <span>Ready for review</span>
+            <strong>${escapeHtml(selected?.name ?? variantName ?? "Default Direction")}</strong>
+          </div>
+          <div class="component-board">
+            ${(selectedComponents.length ? selectedComponents : ["Primary content", "Decision area", "Supporting details"]).slice(0, 6).map((component, index) => `<article class="component-tile">
+              <span class="tile-index">${index + 1}</span>
+              <h3>${escapeHtml(component)}</h3>
+              <p>${escapeHtml(flowHint(selectedFlows, index))}</p>
+            </article>`).join("")}
+          </div>
+        </div>
+      </div>
+    </section>`;
   const screens = artifact.screens.map((screen) => {
     const components = asStrings(screen.components).map((component) => `<li>${escapeHtml(component)}</li>`).join("");
     const flows = asStrings(screen.userFlows).map((flow) => `<li>${escapeHtml(flow)}</li>`).join("");
@@ -83,6 +113,18 @@ function htmlFor(artifact: DesignArtifact, variantName: string | null): string {
     .meta { display: grid; gap: 8px; font-size: 13px; color: var(--muted); }
     .meta strong { color: var(--ink); }
     .screens, .variants { display: grid; gap: 16px; }
+    .prototype-canvas { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 22px; margin-bottom: 18px; }
+    .canvas-header { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: end; margin-bottom: 18px; }
+    .canvas-grid { display: grid; grid-template-columns: 220px 1fr; gap: 18px; }
+    .canvas-nav { display: grid; align-content: start; gap: 8px; }
+    .canvas-nav button { min-height: 38px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); text-align: left; padding: 8px 10px; font: inherit; }
+    .canvas-nav button.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+    .canvas-main { display: grid; gap: 14px; }
+    .status-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 12px; border-radius: 6px; background: var(--soft); color: var(--muted); }
+    .status-strip strong { color: var(--ink); }
+    .component-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .component-tile { min-height: 140px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
+    .tile-index { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; margin-bottom: 10px; }
     .screen { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; align-items: start; margin-bottom: 16px; }
     .panel { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-height: 100%; }
     ul, ol { margin: 0; padding-left: 20px; }
@@ -99,7 +141,7 @@ function htmlFor(artifact: DesignArtifact, variantName: string | null): string {
     @media (max-width: 720px) {
       main { padding: 18px 12px 32px; }
       h1 { font-size: 26px; }
-      .hero, .screen, .tradeoffs { grid-template-columns: 1fr; }
+      .hero, .screen, .tradeoffs, .canvas-header, .canvas-grid, .component-board { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -118,6 +160,7 @@ function htmlFor(artifact: DesignArtifact, variantName: string | null): string {
         <span><strong>Taste Profile:</strong> ${artifact.tasteProfileApplied ? "Applied" : "Not applied"}</span>
       </div>
     </header>
+    ${prototypeCanvas}
     <section class="screens" aria-label="Screens">
       ${screens || "<article class=\"screen\"><div><h2>Primary Screen</h2><p>Structured design details were not available, so this prototype shows the base layout shell.</p></div></article>"}
     </section>
@@ -125,9 +168,17 @@ function htmlFor(artifact: DesignArtifact, variantName: string | null): string {
       <h2>Design Direction</h2>
       <div class="variants">${variants || "<article class=\"variant\"><h3>No variants supplied.</h3><p>Add a design-shotgun artifact to compare directions.</p></article>"}</div>
     </section>
+    <section id="implementation-notes" class="panel" aria-labelledby="implementation-notes-title">
+      <h2 id="implementation-notes-title">Implementation Notes</h2>
+      <p>Use the canvas as a structural prototype: preserve semantic landmarks, validate focus states, and replace static tiles with real components during implementation.</p>
+    </section>
   </main>
 </body>
 </html>`;
+}
+
+function flowHint(flows: string[], index: number): string {
+  return flows[index % Math.max(flows.length, 1)] ?? "Supports the primary user flow with clear state and action feedback.";
 }
 
 function safeName(value: string): string {

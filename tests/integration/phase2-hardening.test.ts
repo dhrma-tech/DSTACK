@@ -521,13 +521,19 @@ describe("Phase 2 hardening pass", () => {
       const prototype = await readFile(String(designHtml.output?.htmlFilePath), "utf8");
       expect(prototype).toContain("invoice table");
       expect(prototype).toContain("Advantages");
+      expect(prototype).toContain("Prototype Canvas");
+      expect(prototype).toContain("Implementation Notes");
 
       const pdf = await executor.run(invocation("/make-pdf", workspace.root, { artifacts: "autoplan,design-html", title: "Phase 2 Report" }));
       expect(pdf.output?.artifactsIncluded).toEqual(["autoplan", "design-html"]);
       expect(Number(pdf.output?.fileSizeKb)).toBeGreaterThan(0);
-      expect(pdf.output?.pageCount).toBe(3);
+      expect(pdf.output?.pageCount).toBe(4);
+      expect(pdf.output?.tocIncluded).toBe(true);
+      expect(pdf.output?.sectionCount).toBe(2);
+      expect(JSON.stringify(pdf.output?.sourceSummaries)).toContain("design-html");
       const pdfBody = await readFile(String(pdf.output?.pdfPath), "utf8");
       expect(pdfBody.startsWith("%PDF-1.4")).toBe(true);
+      expect(pdfBody).toContain("Table of Contents");
 
       const skillify = await executor.run(invocation("/skillify", workspace.root, { name: "status-rollup", description: "Summarize current DStack status", tools: "read_file" }));
       expect(skillify.output?.schemaValid).toBe(true);

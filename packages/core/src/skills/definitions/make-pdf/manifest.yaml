@@ -19,6 +19,9 @@ outputSchema:
     pdfPath: { type: string }
     fileSizeKb: { type: number }
     generatedAt: { type: string }
+    tocIncluded: { type: boolean }
+    sectionCount: { type: number }
+    sourceSummaries: { type: array }
 artifactPath: make-pdf
 nextSkill: null
 failureCases: ["Artifact not found", "PDF render fails"]

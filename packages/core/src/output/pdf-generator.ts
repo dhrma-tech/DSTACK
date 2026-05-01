@@ -21,6 +21,9 @@ export interface PDFGenerationResult extends JsonObject {
   pdfPath: string;
   fileSizeKb: number;
   generatedAt: string;
+  tocIncluded: boolean;
+  sectionCount: number;
+  sourceSummaries: JsonObject[];
 }
 
 export class PDFGenerator {
@@ -29,12 +32,12 @@ export class PDFGenerator {
   async generate(request: PDFGenerationRequest): Promise<PDFGenerationResult> {
     const artifacts = new ArtifactStore(this.options.dstackDir);
     const included: string[] = [];
-    const summaries: Array<{ name: string; summary: string }> = [];
+    const summaries: Array<{ name: string; summary: string; details: string[] }> = [];
     for (const name of request.artifactNames) {
       const artifact = await artifacts.readLatest(name);
       if (artifact) {
         included.push(name);
-        summaries.push({ name, summary: summarizeArtifact(artifact.content) });
+        summaries.push({ name, summary: summarizeArtifact(artifact.content), details: detailLinesForArtifact(artifact.content) });
       }
     }
     const title = request.title || included.join("-") || "dstack-report";
@@ -42,11 +45,24 @@ export class PDFGenerator {
     await ensureDir(path.dirname(pdfPath));
     const pages = [
       [`DStack Report: ${title}`, `Generated: ${new Date().toISOString()}`, `Artifacts: ${included.join(", ") || "none"}`],
-      ...summaries.map((item) => [item.name, item.summary])
+      summaries.length > 1
+        ? ["Table of Contents", ...summaries.map((item, index) => `${index + 1}. /${item.name} - page ${index + 3}`)]
+        : ["Report Contents", ...summaries.map((item) => `/${item.name}`)],
+      ...summaries.map((item, index) => [`Section ${index + 1}: /${item.name}`, item.summary, ...item.details])
     ];
     const pdf = minimalPdf(pages);
     await writeFile(pdfPath, pdf, "binary");
-    return { title, artifactsIncluded: included, pageCount: pages.length, pdfPath, fileSizeKb: Math.ceil(Buffer.byteLength(pdf, "binary") / 1024), generatedAt: new Date().toISOString() };
+    return {
+      title,
+      artifactsIncluded: included,
+      pageCount: pages.length,
+      pdfPath,
+      fileSizeKb: Math.ceil(Buffer.byteLength(pdf, "binary") / 1024),
+      generatedAt: new Date().toISOString(),
+      tocIncluded: summaries.length > 1,
+      sectionCount: summaries.length,
+      sourceSummaries: summaries.map((item) => ({ artifact: item.name, summary: item.summary, details: item.details }))
+    };
   }
 }
 
@@ -97,6 +113,23 @@ function summarizeArtifact(value: JsonObject): string {
         : typeof value.deployVerdict === "string" ? `Deploy: ${value.deployVerdict}`
           : JSON.stringify(value);
   return candidate.slice(0, 1400);
+}
+
+function detailLinesForArtifact(value: JsonObject): string[] {
+  const details: string[] = [];
+  for (const key of ["overallVerdict", "verdict", "healthVerdict", "deployVerdict", "recommendation", "summary", "screenName", "htmlFilePath"]) {
+    const raw = value[key];
+    if (typeof raw === "string" && raw.length > 0) details.push(`${titleCase(key)}: ${raw.slice(0, 500)}`);
+  }
+  const blockers = Array.isArray(value.blockers) ? value.blockers.filter((item): item is string => typeof item === "string") : [];
+  if (blockers.length > 0) details.push(`Blockers: ${blockers.slice(0, 5).join("; ")}`);
+  const recommendations = Array.isArray(value.topRecommendations) ? value.topRecommendations.filter((item): item is string => typeof item === "string") : [];
+  if (recommendations.length > 0) details.push(`Top Recommendations: ${recommendations.slice(0, 5).join("; ")}`);
+  return details.length > 0 ? details : ["No structured details were available for this artifact."];
+}
+
+function titleCase(value: string): string {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^\w/, (match) => match.toUpperCase());
 }
 
 function wrapText(value: string, width: number): string[] {
