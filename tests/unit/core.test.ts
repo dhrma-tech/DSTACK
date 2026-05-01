@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { ArtifactStore, CheckpointStore, ConfigManager, DeployManager, FakeProvider, GeminiProvider, LearningStore, MemoryStore, PermissionGate, ReviewDashboard, SafetyModeManager, SkillExecutor, SkillRegistry, StalenessDetector, StreamHandler, TasteProfileStore, ToolExecutor, ToolRegistry, sanitize, scanDomContent, type ToolHandler } from "@dstack/core";
+import { ArtifactStore, BrowserSessionManager, CheckpointStore, ConfigManager, DeployManager, FakeProvider, GeminiProvider, LearningStore, MemoryStore, PermissionGate, ReviewDashboard, SafetyModeManager, SkillExecutor, SkillRegistry, StalenessDetector, StreamHandler, TasteProfileStore, ToolExecutor, ToolRegistry, sanitize, scanDomContent, type ToolHandler } from "@dstack/core";
 import type { ProjectMemory, SkillInvocation } from "@dstack/shared";
 import { tempWorkspace } from "../helpers/temp-workspace.js";
 
@@ -415,6 +415,7 @@ describe("Phase 2 modules", () => {
     const workspace = await tempWorkspace();
     try {
       const manager = new DeployManager({ projectRoot: workspace.root, dstackDir: path.join(workspace.root, ".dstack") });
+      expect(await manager.getConfig()).toBeNull();
       await manager.writeConfig({
         platform: "custom",
         environment: "staging",
@@ -430,6 +431,7 @@ describe("Phase 2 modules", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z"
       });
+      expect((await manager.getConfig())?.deployCommand).toBe("echo deploy");
       expect((await manager.readConfig()).deployCommand).toBe("echo deploy");
       await manager.freeze("test freeze");
       expect(await manager.isFrozen()).toBe(true);
@@ -445,10 +447,15 @@ describe("Phase 2 modules", () => {
     try {
       const store = new LearningStore({ dstackDir: path.join(workspace.root, ".dstack") });
       await store.add({ topic: "qa", insight: "Keep blockers explicit.", originalText: "Keep blockers explicit.", wasRephrased: false, appliesTo: ["qa"], source: "manual" });
+      await store.add({ topic: "deploy", insight: "Use canaries before production.", originalText: "Use canaries before production.", wasRephrased: false, appliesTo: ["canary"], source: "manual" });
       expect(await store.search("blockers")).toHaveLength(1);
+      expect(await store.search("qa")).toHaveLength(1);
+      expect(await store.search("missing")).toHaveLength(0);
       expect(await store.list("qa")).toHaveLength(1);
       expect(await store.exportMarkdown()).toContain("| qa | Keep blockers explicit.");
-      expect(await store.prune(new Date("2999-01-01T00:00:00.000Z"))).toBe(1);
+      await expect(store.prune("90" as unknown as Date)).rejects.toThrow("olderThan must be a valid Date");
+      await expect(store.pruneOlderThanDays("90" as unknown as number)).rejects.toThrow("olderThanDays must be a number");
+      expect(await store.prune(new Date("2999-01-01T00:00:00.000Z"))).toBe(2);
       expect(await store.all()).toHaveLength(0);
     } finally {
       await workspace.cleanup();
@@ -464,6 +471,24 @@ describe("Phase 2 modules", () => {
       const weights = await store.getWeights();
       expect(weights[0]?.variantName).toBe("Card Explorer");
       expect(weights.find((entry) => entry.variantName === "Compact Dashboard")?.weight).toBeLessThan(1);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  it("normalizes browser session cookies for Playwright reloads", async () => {
+    const workspace = await tempWorkspace();
+    try {
+      const manager = new BrowserSessionManager({ projectRoot: workspace.root, dstackDir: path.join(workspace.root, ".dstack") });
+      await manager.saveCookies("default", [
+        { name: "session", value: "abc", url: "http://127.0.0.1:4321/", path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+        { name: "persist", value: "def", domain: "127.0.0.1", path: "/", expires: 1893456000, httpOnly: true, secure: false, sameSite: "Lax" }
+      ]);
+      const cookies = await manager.loadCookies("default");
+      expect(cookies).toHaveLength(2);
+      expect(cookies[0]?.expires).toBeUndefined();
+      expect(cookies[1]?.expires).toBe(1893456000);
+      expect((await manager.metadata("default")).cookieCount).toBe(2);
     } finally {
       await workspace.cleanup();
     }

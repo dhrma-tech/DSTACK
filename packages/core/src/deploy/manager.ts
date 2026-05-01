@@ -30,9 +30,15 @@ export class DeployManager {
     this.runDir = path.join(options.dstackDir, "deploy-runs");
   }
 
-  async readConfig(): Promise<DeployConfig> {
-    if (!(await exists(this.configPath))) throw new ArtifactError("Deploy config not found. Run /setup-deploy first.");
+  async getConfig(): Promise<DeployConfig | null> {
+    if (!(await exists(this.configPath))) return null;
     return parseDeployConfig(await readJsonFile<unknown>(this.configPath));
+  }
+
+  async readConfig(): Promise<DeployConfig> {
+    const config = await this.getConfig();
+    if (!config) throw new ArtifactError("Deploy config not found. Run /setup-deploy first.");
+    return config;
   }
 
   async writeConfig(config: DeployConfig): Promise<DeployConfig> {

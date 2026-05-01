@@ -57,6 +57,7 @@ export class LearningStore {
   }
 
   async prune(olderThan: Date): Promise<number> {
+    if (!(olderThan instanceof Date) || Number.isNaN(olderThan.getTime())) throw new TypeError("olderThan must be a valid Date");
     const entries = await this.all();
     const retained = entries.filter((entry) => Date.parse(entry.createdAt) >= olderThan.getTime());
     await this.writeAll(retained);
@@ -64,7 +65,8 @@ export class LearningStore {
   }
 
   async pruneOlderThanDays(days: number): Promise<number> {
-    const cutoff = new Date(Date.now() - Math.max(0, days) * 24 * 60 * 60 * 1000);
+    if (typeof days !== "number" || !Number.isFinite(days)) throw new TypeError("olderThanDays must be a number");
+    const cutoff = new Date(Date.now() - Math.max(0, Math.floor(days)) * 24 * 60 * 60 * 1000);
     return this.prune(cutoff);
   }
 

@@ -495,7 +495,7 @@ async function runLearn(context: SkillExecutionContext): Promise<JsonObject> {
     return mark(context, { mode, entriesAffected: results.length, entryId: null, query, exportPath: null, results: results.map((entry) => entry as unknown as JsonObject), learningStoreSize: (await store.all()).length });
   }
   if (mode === "prune") {
-    const days = numberInput(context.invocation.inputs["older-than"], 90);
+    const days = parseDaysInput(context.invocation.inputs["older-than"], 90);
     const before = await store.all();
     const removed = await store.pruneOlderThanDays(days);
     return mark(context, { mode, entriesAffected: removed, entryId: null, query: `older-than:${days}`, exportPath: null, results: before.filter((entry) => Date.parse(entry.createdAt) < Date.now() - days * 24 * 60 * 60 * 1000).map((entry) => entry as unknown as JsonObject), learningStoreSize: (await store.all()).length });
@@ -629,7 +629,10 @@ async function runUnfreeze(context: SkillExecutionContext): Promise<JsonObject> 
 
 async function runCanary(context: SkillExecutionContext): Promise<JsonObject> {
   const manager = new DeployManager({ projectRoot: context.config.projectRoot, dstackDir: context.config.dstackDir });
-  const config = await manager.readConfig();
+  const config = await manager.getConfig();
+  if (!config) {
+    return mark(context, { environment: str(context.invocation.inputs.env, "staging")!, canaryPercent: numberInput(context.invocation.inputs["canary-percent"], 10), deployedAt: nowIso(), monitorDurationMinutes: numberInput(context.invocation.inputs["monitor-duration"], 15), healthChecks: [], canaryVerdict: "INCONCLUSIVE", recommendation: "Run /setup-deploy before /canary.", rollbackExecuted: false, blockers: ["Deploy config missing. Run /setup-deploy first."] });
+  }
   const freezeState = await manager.readState();
   const environment = str(context.invocation.inputs.env, config.environment) ?? "staging";
   const canaryPercent = numberInput(context.invocation.inputs["canary-percent"], 10);
@@ -1155,6 +1158,15 @@ function sameLearning(leftTopic: string, leftInsight: string, rightTopic: string
 
 function numberInput(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function parseDaysInput(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.max(0, Math.floor(value));
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.max(0, Math.floor(parsed));
+  }
+  return fallback;
 }
 
 function sortLearnings<T extends { topic: string; createdAt: string; insight: string }>(entries: T[]): T[] {

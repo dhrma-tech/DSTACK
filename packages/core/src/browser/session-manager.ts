@@ -63,7 +63,7 @@ export class BrowserSessionManager {
     const filePath = this.cookiePath(name);
     if (!(await exists(filePath))) return [];
     const raw = await readJsonFile<unknown>(filePath);
-    return Array.isArray(raw) ? raw.filter(isJsonObject) : [];
+    return Array.isArray(raw) ? raw.filter(isJsonObject).map(normalizeCookie).filter((cookie): cookie is JsonObject => cookie !== null) : [];
   }
 
   async metadata(name: string): Promise<BrowserSessionMetadata> {
@@ -181,4 +181,21 @@ function expiresAtFromCookies(cookies: JsonObject[]): string | null {
   const expiries = cookies.map((cookie) => typeof cookie.expires === "number" ? cookie.expires : null).filter((value): value is number => typeof value === "number" && value > 0);
   if (expiries.length === 0) return null;
   return new Date(Math.min(...expiries) * 1000).toISOString();
+}
+
+function normalizeCookie(cookie: JsonObject): JsonObject | null {
+  if (typeof cookie.name !== "string" || typeof cookie.value !== "string") return null;
+  if (typeof cookie.url !== "string" && typeof cookie.domain !== "string") return null;
+  const normalized: JsonObject = {
+    name: cookie.name,
+    value: cookie.value
+  };
+  if (typeof cookie.url === "string") normalized.url = cookie.url;
+  if (typeof cookie.domain === "string") normalized.domain = cookie.domain;
+  normalized.path = typeof cookie.path === "string" ? cookie.path : "/";
+  if (typeof cookie.expires === "number" && cookie.expires > 0) normalized.expires = cookie.expires;
+  if (typeof cookie.httpOnly === "boolean") normalized.httpOnly = cookie.httpOnly;
+  if (typeof cookie.secure === "boolean") normalized.secure = cookie.secure;
+  if (cookie.sameSite === "Strict" || cookie.sameSite === "Lax" || cookie.sameSite === "None") normalized.sameSite = cookie.sameSite;
+  return normalized;
 }
