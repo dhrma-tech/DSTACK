@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { useApp } from '@/lib/app-context';
+import { apiClient } from '@/lib/api-client';
 import { Globe, Key, Shield, Database } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -16,27 +17,33 @@ export default function SettingsPage() {
     { id: 'storage', label: 'Storage', icon: Database },
   ];
 
-  const toggleProvider = () => {
+  const toggleProvider = async () => {
+    const next = project.provider.current === 'fake' ? 'gemini' : 'fake';
+    // Provider is frontend-only state currently, or we can push it to API
+    await apiClient.updateProjectSettings({ providerMode: next.toUpperCase() });
     updateProject({
       provider: {
         ...project.provider,
-        current: project.provider.current === 'fake' ? 'gemini' : 'fake',
+        current: next,
       },
     });
   };
 
-  const cycleSafety = () => {
+  const cycleSafety = async () => {
     const modes = ['NORMAL', 'CAREFUL', 'GUARD'] as const;
     const idx = modes.indexOf(project.safetyMode.mode);
     const next = modes[(idx + 1) % 3];
+    await apiClient.updateProjectSettings({ safetyMode: next });
     updateProject({
       safetyMode: { mode: next, reason: next !== 'NORMAL' ? `Manually set to ${next}` : null },
     });
   };
 
-  const toggleFreeze = () => {
+  const toggleFreeze = async () => {
+    const next = !project.freezeState.frozen;
+    await apiClient.updateProjectSettings({ freezeState: next });
     updateProject({
-      freezeState: { frozen: !project.freezeState.frozen, reason: !project.freezeState.frozen ? 'Manually frozen from settings' : null },
+      freezeState: { frozen: next, reason: next ? 'Manually frozen from settings' : null },
     });
   };
 

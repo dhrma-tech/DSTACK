@@ -13,16 +13,19 @@ import {
   FileText, Shield, ShieldAlert, History, Box, 
   Maximize2, ExternalLink, Clock, User, AlertTriangle, ArrowRight
 } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import { ExecutionTurn, ToolCall, Artifact } from '@/lib/mock-data';
 
 export default function DstackAgentPage() {
-  const { project, executionSession, workflow, artifacts } = useApp();
+  const { project, workflow, artifacts } = useApp();
+  const [executionSession, setExecutionSession] = useState<ExecutionTurn[]>([]);
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'workflow' | 'artifact' | 'log'>('workflow');
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [skillLauncherOpen, setSkillLauncherOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [runningSkill, setRunningSkill] = useState<string | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +44,63 @@ export default function DstackAgentPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [executionSession]);
+
+  const handleRunCommand = async () => {
+    if (!input.trim() || project.safetyMode.mode === 'GUARD') return;
+    const cmd = input.trim();
+    setInput('');
+    
+    // Add user message to thread
+    const userTurn: ExecutionTurn = { id: Date.now().toString(), type: 'user', content: cmd, timestamp: new Date().toISOString() };
+    setExecutionSession(prev => [...prev, userTurn]);
+
+    // Parse command (basic) e.g., `/office-hours` or `ds /office-hours`
+    const skillMatch = cmd.match(/\/([a-z0-9-]+)/i);
+    const skillName = skillMatch ? skillMatch[1] : 'unknown';
+
+    setRunningSkill(skillName);
+
+    try {
+      // Start the run on the backend
+      const { runId } = await apiClient.runSkill(skillName, { provider: project.provider.current });
+      setCurrentRunId(runId);
+
+      // Connect to SSE stream
+      apiClient.streamRun(runId, (event) => {
+        // Translate backend RunEvents to frontend ExecutionTurns
+        if (event.type === 'reasoning' || event.type === 'error') {
+          setExecutionSession(prev => [
+            ...prev,
+            { 
+              id: Date.now().toString() + Math.random(),
+              type: 'tool_call', // Treat CLI stdout as a shell tool output for UI rendering purposes
+              timestamp: new Date().toISOString(),
+              toolCall: {
+                command: 'ds /' + skillName,
+                args: '',
+                duration: '',
+                gate: 'ALLOW',
+                tool: 'shell',
+                output: event.payload?.message || event.payload || ''
+              }
+            }
+          ]);
+        }
+      }, () => {
+        setRunningSkill(null);
+        setCurrentRunId(null);
+      });
+    } catch (err) {
+      console.error('Failed to run skill', err);
+      setRunningSkill(null);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRunCommand();
+    }
+  };
 
   return (
     <AppShell breadcrumbs={[{ label: project.name }, { label: 'Agent Shell' }]}>
@@ -105,13 +165,15 @@ export default function DstackAgentPage() {
                   <div style={{ fontSize: 18, color: 'var(--color-primary)', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>/</div>
                   <input 
                     value={input} 
-                    onChange={e => setInput(e.target.value)} 
-                    placeholder="Run a skill or describe what you need…" 
-                    style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 15, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} 
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={project.safetyMode.mode === 'GUARD'}
+                    placeholder={project.safetyMode.mode === 'GUARD' ? "Writes and execution blocked by GUARD mode..." : "Run a skill or describe what you need…"} 
+                    style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 15, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', opacity: project.safetyMode.mode === 'GUARD' ? 0.5 : 1 }} 
                   />
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: project.safetyMode.mode === 'GUARD' ? 0.5 : 1, pointerEvents: project.safetyMode.mode === 'GUARD' ? 'none' : 'auto' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface)', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-soft)' }}>⌘K</div>
-                    <button style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button onClick={handleRunCommand} disabled={project.safetyMode.mode === 'GUARD'} style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: project.safetyMode.mode === 'GUARD' ? 'not-allowed' : 'pointer' }}>
                       <Send size={16} />
                     </button>
                   </div>
