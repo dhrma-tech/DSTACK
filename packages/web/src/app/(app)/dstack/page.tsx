@@ -169,12 +169,17 @@ export default function DstackAgentPage() {
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={project.safetyMode.mode === 'GUARD'}
+                    suppressHydrationWarning
                     placeholder={project.safetyMode.mode === 'GUARD' ? "Writes and execution blocked by GUARD mode..." : "Run a skill or describe what you need…"} 
                     style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 15, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', opacity: project.safetyMode.mode === 'GUARD' ? 0.5 : 1 }} 
                   />
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: project.safetyMode.mode === 'GUARD' ? 0.5 : 1, pointerEvents: project.safetyMode.mode === 'GUARD' ? 'none' : 'auto' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface)', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-soft)' }}>⌘K</div>
-                    <button onClick={handleRunCommand} disabled={project.safetyMode.mode === 'GUARD'} style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: project.safetyMode.mode === 'GUARD' ? 'not-allowed' : 'pointer' }}>
+                    <button 
+                      onClick={handleRunCommand} 
+                      disabled={project.safetyMode.mode === 'GUARD'} 
+                      suppressHydrationWarning
+                      style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: project.safetyMode.mode === 'GUARD' ? 'not-allowed' : 'pointer' }}>
                       <Send size={16} />
                     </button>
                   </div>
@@ -187,7 +192,14 @@ export default function DstackAgentPage() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--color-surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, padding: '12px 0', borderBottom: '1px solid var(--color-border-soft)', backgroundColor: 'var(--color-surface-soft)' }}>
               {[{ id: 'workflow', icon: GitBranch }, { id: 'artifact', icon: Box }, { id: 'log', icon: History }].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)', paddingBottom: 8, position: 'relative', transition: 'all 0.2s' }}><tab.icon size={20} />{activeTab === tab.id && <div style={{ position: 'absolute', bottom: -12, left: 0, right: 0, height: 2, backgroundColor: 'var(--color-primary)' }} />}</button>
+                <button 
+                  key={tab.id} 
+                  onClick={() => setActiveTab(tab.id as any)} 
+                  suppressHydrationWarning
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)', paddingBottom: 8, position: 'relative', transition: 'all 0.2s' }}>
+                  <tab.icon size={20} />
+                  {activeTab === tab.id && <div style={{ position: 'absolute', bottom: -12, left: 0, right: 0, height: 2, backgroundColor: 'var(--color-primary)' }} />}
+                </button>
               ))}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
@@ -209,7 +221,7 @@ export default function DstackAgentPage() {
                 <div style={{ height: '100%' }}>
                   {selectedArtifact ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Artifact Inspector</h3><button onClick={() => setSelectedArtifact(null)} style={{ fontSize: 10, color: 'var(--color-primary)', border: 'none', background: 'none', cursor: 'pointer' }}>Close</button></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Artifact Inspector</h3><button onClick={() => setSelectedArtifact(null)} suppressHydrationWarning style={{ fontSize: 10, color: 'var(--color-primary)', border: 'none', background: 'none', cursor: 'pointer' }}>Close</button></div>
                       <div className="card" style={{ padding: 16, marginBottom: 12 }}><div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{selectedArtifact.relativePath.split('/').pop()}</div><div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Version: {selectedArtifact.version}</div></div>
                       <div style={{ flex: 1, minHeight: 0 }}><JsonViewer data={selectedArtifact.content || { empty: true }} title={selectedArtifact.id} /></div>
                     </div>
@@ -331,7 +343,7 @@ function ThreadEvent({ turn, onViewArtifact }: { turn: ExecutionTurn, onViewArti
       <div style={{ marginLeft: 48, marginBottom: 24 }}>
         <div style={{ backgroundColor: 'white', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 6px -1px rgba(16,185,129,0.05), 0 2px 4px -2px rgba(16,185,129,0.05)', borderLeft: '4px solid var(--color-success)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}><div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Box size={18} style={{ color: 'var(--color-success)' }} /></div><div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>Artifact Saved: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{art.relativePath.split('/').pop()}</span></div><div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{art.summary}</div></div></div>
-          <button onClick={() => onViewArtifact(art)} style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 700, border: '1px solid var(--color-primary-soft)', backgroundColor: 'var(--color-primary-soft)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(235, 102, 73, 0.2)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'}>View Details <ExternalLink size={14} /></button>
+          <button onClick={() => onViewArtifact(art)} suppressHydrationWarning style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 700, border: '1px solid var(--color-primary-soft)', backgroundColor: 'var(--color-primary-soft)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(235, 102, 73, 0.2)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'}>View Details <ExternalLink size={14} /></button>
         </div>
         {art.verdict === 'FAIL' && (
           <div style={{ marginTop: 16, backgroundColor: '#fdecea', border: '1px solid rgba(198,69,69,0.1)', borderLeft: '4px solid #c64545', borderRadius: 'var(--radius-md)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -186,12 +186,14 @@ export default function AppSidebar() {
           </Link>
           {!sidebarCollapsed && (
             <button className="btn-ghost" onClick={() => setSidebarCollapsed(true)}
+              suppressHydrationWarning
               style={{ padding: 4, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', background: 'none', color: 'var(--color-text-muted)' }}>
               <ChevronLeft size={16} />
             </button>
           )}
           {sidebarCollapsed && (
             <button className="btn-ghost" onClick={() => setSidebarCollapsed(false)}
+              suppressHydrationWarning
               style={{ padding: 4, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', background: 'none', color: 'var(--color-text-muted)' }}>
               <ChevronRight size={16} />
             </button>
