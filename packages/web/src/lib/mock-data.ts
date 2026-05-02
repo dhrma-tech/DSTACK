@@ -248,3 +248,107 @@ export const MOCK_LEARNINGS = [
   { id: 'learn-1', topic: 'Architecture', insight: 'Prefer server components for data fetching to reduce client bundle size.', source: 'manual', createdAt: '2026-04-28T09:00:00Z' },
   { id: 'learn-2', topic: 'UX Patterns', insight: 'Users prefer explicit confirmation for destructive actions over simple undos.', source: 'retro', createdAt: '2026-04-30T14:00:00Z' },
 ];
+
+export interface ToolCall {
+  id: string;
+  tool: 'shell' | 'file' | 'git' | 'browser' | 'skill';
+  command: string;
+  args: string;
+  duration: string;
+  status: 'success' | 'error' | 'running';
+  gate: 'ALLOW' | 'REQUIRE_APPROVAL' | 'DENY';
+  output: string;
+}
+
+export interface ExecutionTurn {
+  id: string;
+  type: 'user' | 'thought' | 'tool_call' | 'approval' | 'artifact';
+  content?: string;
+  timestamp: string;
+  toolCall?: ToolCall;
+  artifact?: Artifact;
+  approvalRequest?: {
+    action: string;
+    level: 'EXECUTE' | 'WRITE' | 'DESTRUCTIVE';
+    status: 'pending' | 'approved' | 'denied';
+  };
+}
+
+export const MOCK_EXECUTION_SESSION: ExecutionTurn[] = [
+  {
+    id: 't1',
+    type: 'user',
+    content: '/qa --scope auth/',
+    timestamp: '10:42 AM'
+  },
+  {
+    id: 't2',
+    type: 'thought',
+    content: 'I will begin by exploring the authentication logic in the web package. I need to verify if the login and onboarding flows are strictly following the established design tokens.',
+    timestamp: '10:42 AM'
+  },
+  {
+    id: 't3',
+    type: 'tool_call',
+    timestamp: '10:42 AM',
+    toolCall: {
+      id: 'tc1',
+      tool: 'file',
+      command: 'read_file',
+      args: 'packages/web/src/app/login/page.tsx',
+      duration: '45ms',
+      status: 'success',
+      gate: 'ALLOW',
+      output: '// Login page content...\nimport { useApp } from "@/lib/app-context";\n// ...'
+    }
+  },
+  {
+    id: 't4',
+    type: 'thought',
+    content: 'The login page is using the correct context. Now I will check for any console errors or prompt injection vulnerabilities in the current auth state.',
+    timestamp: '10:43 AM'
+  },
+  {
+    id: 't5',
+    type: 'tool_call',
+    timestamp: '10:43 AM',
+    toolCall: {
+      id: 'tc2',
+      tool: 'browser',
+      command: 'take_screenshot',
+      args: 'http://localhost:3000/login',
+      duration: '1.2s',
+      status: 'success',
+      gate: 'ALLOW',
+      output: '[Screenshot Captured]'
+    }
+  },
+  {
+    id: 't6',
+    type: 'approval',
+    timestamp: '10:44 AM',
+    approvalRequest: {
+      action: 'run_skill /qa --force-override',
+      level: 'EXECUTE',
+      status: 'pending'
+    }
+  },
+  {
+    id: 't7',
+    type: 'artifact',
+    timestamp: '10:45 AM',
+    artifact: {
+      id: 'art-fail',
+      skillName: 'qa',
+      artifactType: 'JSON',
+      version: 'v1',
+      createdAt: '2026-05-02T10:45:00Z',
+      isLatest: true,
+      relativePath: '.dstack/artifacts/qa/report.json',
+      verdict: 'FAIL',
+      summary: '2 critical failures in auth flow validation.',
+      warnings: ['Vulnerability: SQL Injection in login field'],
+      content: { failures: 2, critical: true }
+    }
+  }
+];

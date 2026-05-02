@@ -3,8 +3,8 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import {
   MOCK_PROJECT, MOCK_SKILLS, MOCK_RUNS, MOCK_ARTIFACTS, MOCK_WORKFLOW,
-  MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS,
-  type Project, type Skill, type SkillRun, type Artifact, type WorkflowGraph,
+  MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS, MOCK_EXECUTION_SESSION,
+  type Project, type Skill, type SkillRun, type Artifact, type WorkflowGraph, type ExecutionTurn,
 } from './mock-data';
 
 interface AppState {
@@ -17,6 +17,7 @@ interface AppState {
   deployRuns: any[];
   benchmarkRuns: any[];
   learnings: any[];
+  executionSession: ExecutionTurn[];
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
   addRun: (run: SkillRun) => void;
@@ -45,6 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deployRuns: MOCK_DEPLOY_RUNS,
       benchmarkRuns: MOCK_BENCHMARK_RUNS,
       learnings: MOCK_LEARNINGS,
+      executionSession: MOCK_EXECUTION_SESSION,
       sidebarCollapsed,
       setSidebarCollapsed,
       addRun,

@@ -74,7 +74,7 @@ export default function AppShell({ children, breadcrumbs, pageTitle, actions }: 
         </div>
 
         {/* Content */}
-        <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--color-canvas)' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-canvas)', overflow: 'hidden' }}>
           {children}
         </main>
       </div>
