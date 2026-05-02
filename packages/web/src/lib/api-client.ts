@@ -1,29 +1,37 @@
 const API_BASE = 'http://localhost:3001/api';
 
+async function safeFetch<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  try {
+    const res = await fetch(input, init);
+    if (!res.ok) {
+      throw new Error(`API Error ${res.status}: ${res.statusText}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error('Network or API Error:', err);
+    throw err;
+  }
+}
+
 export const apiClient = {
-  async getProject() {
-    const res = await fetch(`${API_BASE}/project`);
-    return res.json();
+  getProject() {
+    return safeFetch<any>(`${API_BASE}/project`);
   },
-  async getSkills() {
-    const res = await fetch(`${API_BASE}/skills`);
-    return res.json();
+  getSkills() {
+    return safeFetch<any[]>(`${API_BASE}/skills`);
   },
-  async getArtifacts() {
-    const res = await fetch(`${API_BASE}/artifacts`);
-    return res.json();
+  getArtifacts() {
+    return safeFetch<any[]>(`${API_BASE}/artifacts`);
   },
-  async getRuns() {
-    const res = await fetch(`${API_BASE}/runs`);
-    return res.json();
+  getRuns() {
+    return safeFetch<any[]>(`${API_BASE}/runs`);
   },
-  async runSkill(skillName: string, args: Record<string, string> = {}) {
-    const res = await fetch(`${API_BASE}/skills/${skillName}/run`, {
+  runSkill(skillName: string, args: Record<string, string> = {}) {
+    return safeFetch<any>(`${API_BASE}/skills/${skillName}/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(args)
     });
-    return res.json();
   },
   streamRun(runId: string, onEvent: (event: any) => void, onComplete: () => void) {
     const eventSource = new EventSource(`${API_BASE}/runs/${runId}/stream`);
@@ -45,20 +53,18 @@ export const apiClient = {
 
     return () => eventSource.close();
   },
-  async respondToApproval(runId: string, decision: 'approve' | 'deny') {
-    const res = await fetch(`${API_BASE}/approvals/${runId}/respond`, {
+  respondToApproval(runId: string, decision: 'approve' | 'deny') {
+    return safeFetch<any>(`${API_BASE}/approvals/${runId}/respond`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision })
     });
-    return res.json();
   },
-  async updateProjectSettings(settings: { safetyMode?: string, freezeState?: boolean, providerMode?: string }) {
-    const res = await fetch(`${API_BASE}/project/settings`, {
+  updateProjectSettings(settings: { safetyMode?: string, freezeState?: boolean, providerMode?: string }) {
+    return safeFetch<any>(`${API_BASE}/project/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
     });
-    return res.json();
   }
 };

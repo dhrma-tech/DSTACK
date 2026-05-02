@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Clock, ExternalLink, History } from 'lucide-react';
 
 export default function RunsPage() {
-  const { runs } = useApp();
+  const { runs, isLoading } = useApp();
 
   return (
     <AppShell breadcrumbs={[{ label: 'Runs' }]}>
@@ -21,7 +21,11 @@ export default function RunsPage() {
           </p>
         </div>
 
-        {runs.length === 0 ? (
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton skeleton-block" style={{ height: 48 }} />)}
+          </div>
+        ) : runs.length === 0 ? (
           <EmptyState icon={<History size={48} strokeWidth={1} />} title="No runs yet"
             description="Execute a skill from the Skills page to see run history here." />
         ) : (

@@ -17,7 +17,7 @@ import { apiClient } from '@/lib/api-client';
 import { ExecutionTurn, ToolCall, Artifact } from '@/lib/mock-data';
 
 export default function DstackAgentPage() {
-  const { project, workflow, artifacts } = useApp();
+  const { project, workflow, artifacts, toast } = useApp();
   const [executionSession, setExecutionSession] = useState<ExecutionTurn[]>([]);
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState<'workflow' | 'artifact' | 'log'>('workflow');
@@ -92,6 +92,7 @@ export default function DstackAgentPage() {
       });
     } catch (err) {
       console.error('Failed to run skill', err);
+      toast('Failed to run skill. Check backend connection.', 'error');
       setRunningSkill(null);
     }
   };

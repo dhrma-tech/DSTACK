@@ -22,6 +22,14 @@ interface AppState {
   setSidebarCollapsed: (v: boolean) => void;
   addRun: (run: SkillRun) => void;
   updateProject: (partial: Partial<Project>) => void;
+  toast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  isLoading: boolean;
+}
+
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -35,6 +43,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [workflow, setWorkflow] = useState<WorkflowGraph>(MOCK_WORKFLOW);
   const [runs, setRuns] = useState<SkillRun[]>(MOCK_RUNS);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now().toString() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
 
   React.useEffect(() => {
     async function loadData() {
@@ -85,6 +103,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error('Failed to load initial data from backend:', err);
+      } finally {
+        setIsLoading(false);
       }
     }
     loadData();
@@ -114,8 +134,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSidebarCollapsed,
       addRun,
       updateProject,
+      toast: showToast,
+      isLoading,
     }}>
       {children}
+      {toasts.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 9999 }}>
+          {toasts.map(t => (
+            <div key={t.id} className={`toast toast-${t.type}`} style={{
+              padding: '12px 16px', borderRadius: 'var(--radius-md)', fontSize: 13, fontWeight: 500,
+              boxShadow: 'var(--shadow-md)', animation: 'fadeInUp 0.3s ease-out',
+              backgroundColor: t.type === 'error' ? 'var(--color-error)' : t.type === 'success' ? 'var(--color-success)' : 'var(--color-surface)',
+              color: t.type === 'error' || t.type === 'success' ? 'white' : 'var(--color-text-primary)',
+              border: t.type === 'info' ? '1px solid var(--color-border)' : 'none',
+              display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              {t.message}
+            </div>
+          ))}
+        </div>
+      )}
     </AppContext.Provider>
   );
 }

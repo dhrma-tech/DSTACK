@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { project, skills, runs, artifacts, workflow } = useApp();
+  const { project, skills, runs, artifacts, workflow, isLoading } = useApp();
 
   const completedSkills = workflow.nodes.filter(n => n.status === 'complete').length;
   const totalSkills = workflow.nodes.length;
@@ -21,8 +21,24 @@ export default function DashboardPage() {
   return (
     <AppShell breadcrumbs={[{ label: 'Dashboard' }]}>
       <div style={{ padding: '32px 32px 64px' }}>
-        {/* Project Header */}
-        <div style={{ marginBottom: 32 }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <div>
+              <div className="skeleton skeleton-title" />
+              <div className="skeleton skeleton-text" style={{ width: '30%' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              {[1, 2, 3, 4].map(i => <div key={i} className="skeleton skeleton-block" style={{ height: 100 }} />)}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="skeleton skeleton-block" style={{ height: 180 }} />
+              <div className="skeleton skeleton-block" style={{ height: 180 }} />
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Project Header */}
+            <div style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <h1 style={{ fontSize: 32, fontFamily: 'var(--font-serif)' }}>{project.name}</h1>
             <span className="badge badge-neutral" style={{ textTransform: 'capitalize', letterSpacing: 0 }}>
@@ -159,6 +175,8 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+          </>
+        )}
       </div>
     </AppShell>
   );

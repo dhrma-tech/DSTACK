@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api-client';
 import { Globe, Key, Shield, Database } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { project, updateProject } = useApp();
+  const { project, updateProject, toast } = useApp();
   const [activeTab, setActiveTab] = useState('providers');
 
   const tabs = [
@@ -18,33 +18,44 @@ export default function SettingsPage() {
   ];
 
   const toggleProvider = async () => {
-    const next = project.provider.current === 'fake' ? 'gemini' : 'fake';
-    // Provider is frontend-only state currently, or we can push it to API
-    await apiClient.updateProjectSettings({ providerMode: next.toUpperCase() });
-    updateProject({
-      provider: {
-        ...project.provider,
-        current: next,
-      },
-    });
+    try {
+      const next = project.provider.current === 'fake' ? 'gemini' : 'fake';
+      await apiClient.updateProjectSettings({ providerMode: next.toUpperCase() });
+      updateProject({
+        provider: { ...project.provider, current: next },
+      });
+      toast(`Provider switched to ${next}`, 'success');
+    } catch {
+      toast('Failed to update provider.', 'error');
+    }
   };
 
   const cycleSafety = async () => {
-    const modes = ['NORMAL', 'CAREFUL', 'GUARD'] as const;
-    const idx = modes.indexOf(project.safetyMode.mode);
-    const next = modes[(idx + 1) % 3];
-    await apiClient.updateProjectSettings({ safetyMode: next });
-    updateProject({
-      safetyMode: { mode: next, reason: next !== 'NORMAL' ? `Manually set to ${next}` : null },
-    });
+    try {
+      const modes = ['NORMAL', 'CAREFUL', 'GUARD'] as const;
+      const idx = modes.indexOf(project.safetyMode.mode);
+      const next = modes[(idx + 1) % 3];
+      await apiClient.updateProjectSettings({ safetyMode: next });
+      updateProject({
+        safetyMode: { mode: next, reason: next !== 'NORMAL' ? `Manually set to ${next}` : null },
+      });
+      toast(`Safety mode set to ${next}`, 'success');
+    } catch {
+      toast('Failed to change safety mode.', 'error');
+    }
   };
 
   const toggleFreeze = async () => {
-    const next = !project.freezeState.frozen;
-    await apiClient.updateProjectSettings({ freezeState: next });
-    updateProject({
-      freezeState: { frozen: next, reason: next ? 'Manually frozen from settings' : null },
-    });
+    try {
+      const next = !project.freezeState.frozen;
+      await apiClient.updateProjectSettings({ freezeState: next });
+      updateProject({
+        freezeState: { frozen: next, reason: next ? 'Manually frozen from settings' : null },
+      });
+      toast(next ? 'Deploys are now frozen' : 'Deploys unfrozen', 'success');
+    } catch {
+      toast('Failed to update freeze state.', 'error');
+    }
   };
 
   return (
