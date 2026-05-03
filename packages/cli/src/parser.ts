@@ -9,6 +9,7 @@ export interface ParsedCommand {
   skillCheck: boolean;
   serve: boolean;
   json: boolean;
+  jsonEvents: boolean;
   verbose: boolean;
   invocation: SkillInvocation | null;
   serveOptions?: {
@@ -39,11 +40,12 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("model", { type: "string" })
     .option("provider", { type: "string", choices: ["gemini", "fake"] })
     .option("json", { type: "boolean", default: false })
+    .option("json-events", { type: "boolean", default: false })
     .option("verbose", { type: "boolean", default: false })
     .option("allow-secrets", { type: "boolean", default: false })
     .parse();
   const skillName = parsed._.map(String)[0] ?? null;
-  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "serve", "host", "port", "token-file", "allow-absolute-paths", "force", "dry-run", "no-stream", "model", "provider", "json", "verbose", "allow-secrets"]);
+  const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "serve", "host", "port", "token-file", "allow-absolute-paths", "force", "dry-run", "no-stream", "model", "provider", "json", "json-events", "verbose", "allow-secrets"]);
   const inputs: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!reserved.has(key) && isJsonValue(value)) inputs[key] = value;
@@ -55,6 +57,7 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     skillCheck: parsed["skill-check"] === true,
     serve: parsed.serve === true,
     json: parsed.json === true,
+    jsonEvents: parsed["json-events"] === true,
     verbose: parsed.verbose === true,
     invocation: skillName
       ? {
@@ -66,7 +69,8 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
             noStream: parsed["no-stream"] === true,
             model: typeof parsed.model === "string" ? parsed.model : null,
             provider: isProviderName(parsed.provider) ? parsed.provider : null,
-            allowSecrets: parsed["allow-secrets"] === true
+            allowSecrets: parsed["allow-secrets"] === true,
+            jsonEvents: parsed["json-events"] === true
           },
           projectRoot
         }

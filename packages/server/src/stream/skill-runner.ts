@@ -9,6 +9,7 @@ export interface RunEvent {
 
 export class SkillRunner {
   private activeRuns = new Map<string, EventEmitter>();
+  private childProcesses = new Map<string, import('child_process').ChildProcess>();
   private runLogs = new Map<string, RunEvent[]>();
 
   startRun(runId: string, skillName: string, args: Record<string, string> = {}) {
@@ -19,13 +20,13 @@ export class SkillRunner {
     // Push initial command event
     this.emitEvent(runId, {
       type: 'reasoning',
-      payload: `Starting skill: /${skillName}`
+      text: `Starting skill: /${skillName}`
     });
 
     // Format CLI args
-    const cliArgs = [`/${skillName}`];
+    const cliArgs = [`/${skillName}`, '--json-events'];
     for (const [key, value] of Object.entries(args)) {
-      if (value) cliArgs.push(`--${key}=${value}`);
+      if (value !== undefined && value !== null) cliArgs.push(`--${key}=${value}`);
     }
 
     // Determine project root. If cwd is packages/server, go up two levels.
@@ -35,37 +36,47 @@ export class SkillRunner {
       
     const cliScript = path.resolve(projectRoot, 'packages/cli/src/index.ts');
 
-    const child = spawn('npx', ['tsx', cliScript, `/${skillName}`, ...cliArgs.slice(1)], {
+    const child = spawn('npx', ['tsx', cliScript, ...cliArgs], {
       cwd: projectRoot,
       shell: true
     });
+    this.childProcesses.set(runId, child);
 
     child.stdout.on('data', (data) => {
-      const text = data.toString();
-      // Extremely basic heuristic to convert CLI text to SSE events
-      // For a real implementation, the CLI should output structured JSON
-      this.emitEvent(runId, {
-        type: 'reasoning',
-        payload: text
-      });
+      const lines = data.toString().split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          this.emitEvent(runId, event);
+        } catch (e) {
+          // Fallback if not JSON
+          this.emitEvent(runId, {
+            type: 'reasoning',
+            text: line
+          } as any);
+        }
+      }
     });
 
     child.stderr.on('data', (data) => {
       const text = data.toString();
       this.emitEvent(runId, {
         type: 'error',
-        payload: { message: text }
-      });
+        message: text
+      } as any);
     });
 
     child.on('close', (code) => {
       this.emitEvent(runId, {
         type: 'complete',
-        payload: { exitCode: code }
-      });
+        status: code === 0 ? 'complete' : 'error',
+        skillName
+      } as any);
       // We keep the log around for late joiners, but we might want to clean up emitters
       setTimeout(() => {
         this.activeRuns.delete(runId);
+        this.childProcesses.delete(runId);
       }, 60000);
     });
 
@@ -91,12 +102,14 @@ export class SkillRunner {
   }
 
   respondToApproval(runId: string, decision: 'approve' | 'deny') {
-    // In a real implementation, this would send input to the child process's stdin
-    // For now, we'll just mock it
-    this.emitEvent(runId, {
-      type: 'reasoning',
-      payload: `Approval decision received: ${decision}`
-    });
+    const child = this.childProcesses.get(runId);
+    if (child && child.stdin) {
+      child.stdin.write(decision === 'approve' ? 'y\n' : 'n\n');
+      this.emitEvent(runId, {
+        type: 'reasoning',
+        text: `Approval decision sent: ${decision}`
+      } as any);
+    }
   }
 }
 

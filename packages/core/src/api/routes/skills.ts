@@ -117,7 +117,8 @@ export class SkillsRoutes {
           noStream: true,
           model: null,
           provider: "fake",
-          allowSecrets: false
+          allowSecrets: false,
+          jsonEvents: false
         },
         projectRoot: this.projectRoot
       });

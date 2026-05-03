@@ -3,6 +3,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { PermissionError, type PermissionDecision, type PermissionLevel, type SafetyMode, type ToolCall } from "@dstack/shared";
 import { normalMode, SafetyModeManager } from "./safety/mode-manager.js";
 
+import type { SessionLogger } from "./logger.js";
 const destructive = [
   /\brm\s+-rf\b/i,
   /\bsudo\b/i,
@@ -30,13 +31,22 @@ const destructive = [
 const approved = [/^npm\s+run\b/i, /^yarn\b/i, /^pnpm\b/i, /^npx\s+(vitest|jest|tsc)\b/i, /^git\s+(status|diff|log)\b/i, /^(ls|dir|echo)\b/i];
 
 export class PermissionGate {
-  constructor(private readonly options: { interactive: boolean; dstackDir?: string | null }) {}
+  constructor(private readonly options: { interactive: boolean; dstackDir?: string | null; logger?: SessionLogger | null }) {}
   async check(toolCall: ToolCall): Promise<PermissionDecision> {
     const staticDecision = decisionFor(toolCall);
     const mode = this.options.dstackDir ? await new SafetyModeManager({ dstackDir: this.options.dstackDir }).read() : normalMode();
     const decision = applySafetyMode(staticDecision, toolCall, mode);
     if (decision === "ALLOW" || decision === "DENY") return decision;
     if (!this.options.interactive) throw new PermissionError("Tool call requires approval in non-interactive mode", { tool: toolCall.name });
+    
+    // Emit approval-required event
+    await this.options.logger?.event("info", "approval-required", {
+      description: `Run ${toolCall.name}: ${JSON.stringify(toolCall.input)}`,
+      toolName: toolCall.name,
+      args: toolCall.input,
+      permissionLevel: permissionLevelFor(toolCall)
+    });
+
     const rl = readline.createInterface({ input, output });
     try {
       const answer = await rl.question(`DStack wants to run ${toolCall.name}: ${JSON.stringify(toolCall.input)}\nApprove? [y/N] `);

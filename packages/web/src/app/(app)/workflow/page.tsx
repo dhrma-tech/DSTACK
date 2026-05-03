@@ -30,7 +30,7 @@ export default function WorkflowPage() {
         {workflow.blockers.length > 0 && (
           <div style={{ marginBottom: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-warning)', marginBottom: 6, textTransform: 'uppercase' }}>Blockers</div>
-            {workflow.blockers.map((b, i) => (
+            {workflow.blockers.map((b: string, i: number) => (
               <div key={i} style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>• {b}</div>
             ))}
           </div>
@@ -39,7 +39,7 @@ export default function WorkflowPage() {
         {/* Graph Visualization */}
         <div className="card" style={{ padding: 32, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 'max-content' }}>
-            {workflow.nodes.map((node, i) => (
+            {workflow.nodes.map((node: any, i: number) => (
               <React.Fragment key={node.id}>
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -78,7 +78,7 @@ export default function WorkflowPage() {
         {workflow.suggestedNextSkills.length > 0 && (
           <div style={{ marginTop: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-primary-soft)', border: '1px solid rgba(230,126,90,0.15)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>Suggested next: </span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{workflow.suggestedNextSkills.map(s => `/${s}`).join(', ')}</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{workflow.suggestedNextSkills.map((s: string) => `/${s}`).join(', ')}</span>
           </div>
         )}
       </div>

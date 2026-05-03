@@ -4,6 +4,7 @@ import React from 'react';
 import AppShell from '@/components/AppShell';
 import EmptyState from '@/components/EmptyState';
 import { useApp } from '@/lib/app-context';
+import { type BenchmarkResult } from '@/lib/mock-data';
 import { BarChart3, Clock, Zap, DollarSign } from 'lucide-react';
 
 export default function BenchmarksPage() {
@@ -50,7 +51,7 @@ export default function BenchmarksPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {run.results.map(res => (
+                      {run.results.map((res: BenchmarkResult) => (
                         <tr key={res.model}>
                           <td style={{ fontWeight: 600 }}>{res.model}</td>
                           <td>

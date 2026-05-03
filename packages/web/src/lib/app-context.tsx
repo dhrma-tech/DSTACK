@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import {
   MOCK_PROJECT, MOCK_SKILLS, MOCK_RUNS, MOCK_ARTIFACTS, MOCK_WORKFLOW,
   MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS, MOCK_EXECUTION_SESSION,
-  type Project, type Skill, type SkillRun, type Artifact, type WorkflowGraph, type ExecutionTurn,
+  type BenchmarkRun, type Learning, type BrowserSnapshot, type DeployRun
 } from './mock-data';
 
 interface AppState {
@@ -13,10 +13,10 @@ interface AppState {
   runs: SkillRun[];
   artifacts: Artifact[];
   workflow: WorkflowGraph;
-  snapshots: any[];
-  deployRuns: any[];
-  benchmarkRuns: any[];
-  learnings: any[];
+  snapshots: BrowserSnapshot[];
+  deployRuns: DeployRun[];
+  benchmarkRuns: BenchmarkRun[];
+  learnings: Learning[];
   executionSession: ExecutionTurn[];
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;

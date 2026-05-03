@@ -13,10 +13,10 @@ import {
 export default function DashboardPage() {
   const { project, skills, runs, artifacts, workflow, isLoading } = useApp();
 
-  const completedSkills = workflow.nodes.filter(n => n.status === 'complete').length;
+  const completedSkills = workflow.nodes.filter((n: any) => n.status === 'complete').length;
   const totalSkills = workflow.nodes.length;
   const suggestedSkill = workflow.suggestedNextSkills[0];
-  const suggestedSkillData = skills.find(s => s.name === suggestedSkill);
+  const suggestedSkillData = skills.find((s: any) => s.name === suggestedSkill);
 
   return (
     <AppShell breadcrumbs={[{ label: 'Dashboard' }]}>
@@ -28,7 +28,7 @@ export default function DashboardPage() {
               <div className="skeleton skeleton-text" style={{ width: '30%' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              {[1, 2, 3, 4].map(i => <div key={i} className="skeleton skeleton-block" style={{ height: 100 }} />)}
+              {[1, 2, 3, 4].map((i: number) => <div key={i} className="skeleton skeleton-block" style={{ height: 100 }} />)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="skeleton skeleton-block" style={{ height: 180 }} />
@@ -57,7 +57,7 @@ export default function DashboardPage() {
             { label: 'Artifacts', value: `${project.artifactCounts.latest}`, sub: `${project.artifactCounts.stale} stale`, icon: Box, color: 'var(--color-accent-teal)' },
             { label: 'Recent Runs', value: `${runs.length}`, sub: 'total runs', icon: History, color: 'var(--color-accent-blue)' },
             { label: 'Blockers', value: `${workflow.blockers.length}`, sub: workflow.blockers.length ? 'action needed' : 'all clear', icon: AlertTriangle, color: workflow.blockers.length ? 'var(--color-warning)' : 'var(--color-success)' },
-          ].map(stat => (
+          ].map((stat: any) => (
             <div key={stat.label} className="card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' }}>{stat.label}</span>
@@ -98,7 +98,7 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {workflow.nodes.map((node, i) => (
+              {workflow.nodes.map((node: any, i: number) => (
                 <React.Fragment key={node.id}>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
@@ -139,7 +139,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {runs.slice(0, 5).map(run => (
+                {runs.slice(0, 5).map((run: any) => (
                   <tr key={run.id} style={{ cursor: 'pointer' }}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{run.id}</td>
                     <td style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{run.command}</td>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
             <Link href="/artifacts" style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>View all →</Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {artifacts.filter(a => a.isLatest).slice(0, 3).map(art => (
+            {artifacts.filter((a: any) => a.isLatest).slice(0, 3).map((art: any) => (
               <div key={art.id} className="card card-interactive" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                   <Box size={16} style={{ color: 'var(--color-primary)' }} />

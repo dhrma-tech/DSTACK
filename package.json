@@ -12,7 +12,11 @@
     "lint": "eslint .",
     "skill:check": "tsx scripts/validate-skill-manifests.ts",
     "ds": "tsx --conditions development packages/cli/src/index.ts",
-    "backend:smoke": "node scripts/backend-smoke.mjs"
+    "backend:smoke": "node scripts/backend-smoke.mjs",
+    "web": "pnpm --filter @dstack/web dev",
+    "server": "pnpm --filter @dstack/server dev",
+    "serve": "pnpm ds -- serve",
+    "dev": "pnpm --filter @dstack/server --filter @dstack/web --parallel dev"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
@@ -25,5 +29,10 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.10"
+    }
   }
 }

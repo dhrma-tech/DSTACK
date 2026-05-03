@@ -100,7 +100,7 @@ export default function Home() {
             { icon: Box, title: 'Artifact System', desc: 'Versioned, validated JSON artifacts with diff comparison and staleness tracking.' },
             { icon: Terminal, title: 'Developer CLI', desc: 'Full CLI with skill invocation, benchmarks, and deploy management. Web UI optional.' },
             { icon: BarChart3, title: 'Model Benchmarks', desc: 'Compare models across quality, latency, cost, and token usage on your own prompt suites.' },
-          ].map(f => (
+          ].map((f: any) => (
             <div key={f.title} className="card" style={{ padding: 24 }}>
               <f.icon size={24} style={{ color: 'var(--color-primary)', marginBottom: 12 }} />
               <h3 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-sans)', marginBottom: 6 }}>{f.title}</h3>
@@ -130,7 +130,7 @@ export default function Home() {
             { cmd: '/ship', stage: 'Ship' },
             { cmd: '/benchmark', stage: 'QA' },
             { cmd: '/deploy', stage: 'Ship' },
-          ].map(s => (
+          ].map((s: any) => (
             <div key={s.cmd} className="card card-interactive" style={{ padding: '14px 16px', textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{s.cmd}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{s.stage}</div>
@@ -158,7 +158,7 @@ export default function Home() {
               { name: '/review', done: false },
               { name: '/qa', done: false },
               { name: '/ship', done: false },
-            ].map((step, i, arr) => (
+            ].map((step: any, i: number, arr: any[]) => (
               <React.Fragment key={step.name}>
                 <div style={{
                   padding: '10px 16px', borderRadius: 'var(--radius-md)',

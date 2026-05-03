@@ -82,14 +82,16 @@ export class SkillExecutor {
   async run(invocation: SkillInvocation): Promise<SkillRunResult> {
     const manifest = await this.registry.resolve(invocation.skillName);
     validateInputs(manifest, invocation.inputs);
-    const session = await this.logger.createSession(manifest.name);
+    const session = await this.logger.createSession(manifest.name, invocation.flags.jsonEvents);
     try {
+      await session.event("info", "reasoning", { text: `Resolving prerequisites for /${manifest.name}...` });
       const prerequisiteArtifacts: Record<string, JsonObject> = {};
       for (const required of manifest.requiresArtifacts) {
         const artifact = await this.artifacts.readLatest(required);
         if (!artifact && !invocation.flags.force) throw new ArtifactError(`/${manifest.name} requires /${required}. Run /${required} first or pass --force.`);
         if (artifact) prerequisiteArtifacts[required] = artifact.content;
       }
+      await session.event("info", "reasoning", { text: `Enforcing workflow gates for /${manifest.name}...` });
       await enforceWorkflowGates(manifest, prerequisiteArtifacts, invocation.flags.force, this.options.config.dstackDir);
       const toolExecutor = new ToolExecutor(this.tools, { projectRoot: invocation.projectRoot, config: this.options.config, logger: session, interactive: this.options.interactive ?? true });
       const context: SkillExecutionContext = { manifest, invocation, config: this.options.config, artifactStore: this.artifacts, memoryStore: this.memory, checkpointStore: this.checkpoints, toolExecutor, prerequisiteArtifacts, generatedBy: this.generatedBy };
@@ -108,6 +110,7 @@ export class SkillExecutor {
       const toolResults: JsonObject[] = [];
       let rawOutput = "";
       for (let i = 0; i < 8; i += 1) {
+        await session.event("info", "reasoning", { text: `Thinking (Iteration ${i + 1}/8)...` });
         const builtContext = await handler.buildContext(context);
         const rendered = await new PromptTemplateEngine().render({
           manifest,
@@ -128,6 +131,9 @@ export class SkillExecutor {
       validateOutputSchema(manifest, output);
       if (manifest.name === "office-hours") await this.memory.seedFromOfficeHours(output);
       const artifact = invocation.flags.dryRun ? null : await this.artifacts.write(manifest.name, output);
+      if (artifact) {
+        await session.event("info", "artifact-saved", { skillName: manifest.name, verdict: extractVerdict(output), path: artifact.filePath });
+      }
       if (artifact && handler.postSave) {
         await handler.postSave(output, context, artifact.filePath);
       }

@@ -9,15 +9,36 @@ import {
   ChevronRight, Box, Cpu, CheckCircle2
 } from 'lucide-react';
 
+import { useActiveRun } from '@/hooks/useActiveRun';
+import EventThread from '@/components/shell/EventThread';
+
 export default function WorkspacePage() {
   const { project, skills, artifacts } = useApp();
   const [inputValue, setInputValue] = useState('');
-  const [executionState, setExecutionState] = useState<'idle' | 'running' | 'completed'>('idle');
+  const { startRun, events, status, respondToApproval, isExecuting } = useActiveRun();
 
   const handleRun = () => {
     if (!inputValue.trim()) return;
-    setExecutionState('running');
-    setTimeout(() => setExecutionState('completed'), 3000);
+    
+    // Check if it's a skill command
+    if (inputValue.startsWith('/')) {
+      const parts = inputValue.split(' ');
+      const skillName = parts[0].substring(1);
+      const args: Record<string, string> = {};
+      
+      // Basic arg parsing
+      for (let i = 1; i < parts.length; i++) {
+        if (parts[i].startsWith('--')) {
+          const [key, val] = parts[i].substring(2).split('=');
+          args[key] = val;
+        }
+      }
+      
+      startRun(skillName, args);
+    } else {
+      // General prompt handling could go here
+      startRun('office-hours', { idea: inputValue });
+    }
   };
 
   const projectFiles = [
@@ -58,7 +79,7 @@ export default function WorkspacePage() {
             </div>
           </div>
           <div style={{ padding: '8px 0', overflowY: 'auto', flex: 1 }}>
-            {projectFiles.map(file => (
+            {projectFiles.map((file: string) => (
               <div key={file} style={{
                 padding: '7px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8,
                 cursor: 'pointer', color: 'var(--color-text-secondary)',
@@ -110,42 +131,24 @@ export default function WorkspacePage() {
               </div>
 
               {/* Execution Output */}
-              {executionState !== 'idle' && (
-                <div style={{ marginTop: 8, marginBottom: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <StatusBadge status={executionState === 'running' ? 'running' : 'complete'} label={executionState === 'running' ? 'Executing /office-hours' : 'Completed'} />
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Started 2s ago</span>
+              {status !== 'idle' && (
+                <div style={{ marginTop: 8, marginBottom: 24, width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                    <StatusBadge status={status === 'connected' ? 'running' : 'complete'} label={status === 'connected' ? 'Executing' : 'Execution Finished'} />
+                    {status === 'error' && <span style={{ color: 'var(--color-error)', fontSize: 12 }}>Run failed</span>}
                   </div>
-                  <div style={{
-                    backgroundColor: 'var(--color-surface-soft)', borderRadius: 'var(--radius-md)',
-                    padding: 20, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.8,
-                    color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-soft)',
-                  }}>
-                    <div>[DSTACK] Initializing agentic loop...</div>
-                    <div>[DSTACK] Analyzing input: &quot;{inputValue || 'Build a SaaS'}&quot;</div>
-                    <div style={{ color: 'var(--color-accent-teal)' }}>[DSTACK] Step 1: Market analysis completed.</div>
-                    {executionState === 'running' ? (
-                      <div style={{ color: 'var(--color-primary)' }}>[DSTACK] Step 2: Synthesizing roadmap... (80%)</div>
-                    ) : (
-                      <>
-                        <div style={{ color: 'var(--color-accent-teal)' }}>[DSTACK] Step 2: Synthesizing roadmap completed.</div>
-                        <div style={{ marginTop: 12, padding: 12, backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-soft)' }}>
-                          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>Generated Artifact: roadmap.json</div>
-                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Click to open in artifacts →</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  
+                  <EventThread events={events} onApproval={respondToApproval} />
                 </div>
               )}
 
               {/* Suggestions */}
-              {executionState === 'idle' && (
+              {status === 'idle' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {[
                     { label: 'Run Office Hours', desc: 'Brainstorm product strategy with AI.', cmd: '/office-hours --idea "Build a SaaS"' },
                     { label: 'Update Auto Plan', desc: 'Synchronize project state with current PRs.', cmd: '/autoplan --source "roadmap.json"' },
-                  ].map(s => (
+                  ].map((s: any) => (
                     <div key={s.label} className="card card-interactive" style={{ padding: 14, cursor: 'pointer' }}
                       onClick={() => setInputValue(s.cmd)}>
                       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{s.label}</div>
@@ -189,9 +192,9 @@ export default function WorkspacePage() {
             {/* Artifacts */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', marginBottom: 10 }}>
-                Artifacts ({artifacts.filter(a => a.isLatest).length})
+                Artifacts ({artifacts.filter((a: any) => a.isLatest).length})
               </div>
-              {artifacts.filter(a => a.isLatest).map(art => (
+              {artifacts.filter((a: any) => a.isLatest).map((art: any) => (
                 <div key={art.id} style={{
                   padding: '5px 8px', fontSize: 12, borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,

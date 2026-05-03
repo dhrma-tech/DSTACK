@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/StatusBadge';
 import { useApp } from '@/lib/app-context';
+import { type BrowserSnapshot } from '@/lib/mock-data';
 import { Globe, AlertCircle, Clock, ExternalLink, ShieldAlert } from 'lucide-react';
 
 export default function BrowserPage() {
@@ -28,7 +29,7 @@ export default function BrowserPage() {
           />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-            {snapshots.map(snap => (
+            {snapshots.map((snap: BrowserSnapshot) => (
               <div key={snap.id} className="card card-interactive" style={{ padding: 0, overflow: 'hidden' }}>
                 {/* Thumbnail placeholder */}
                 <div style={{ height: 160, backgroundColor: 'var(--color-surface-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border-soft)' }}>

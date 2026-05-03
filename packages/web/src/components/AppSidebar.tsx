@@ -76,11 +76,11 @@ export default function AppSidebar() {
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* DSTACK Primary Action */}
         <div style={{ padding: '12px 8px' }}>
-          <Link href="/dstack" className={`sidebar-item${pathname === '/dstack' ? ' active' : ''}`} 
+          <Link href="/workspace" className={`sidebar-item${pathname === '/workspace' ? ' active' : ''}`} 
             style={{ 
               padding: '10px 14px',
-              backgroundColor: pathname === '/dstack' ? 'var(--color-primary-soft)' : 'var(--color-surface)',
-              border: `1px solid ${pathname === '/dstack' ? 'var(--color-primary-soft)' : 'var(--color-border-soft)'}`,
+              backgroundColor: pathname === '/workspace' ? 'var(--color-primary-soft)' : 'var(--color-surface)',
+              border: `1px solid ${pathname === '/workspace' ? 'var(--color-primary-soft)' : 'var(--color-border-soft)'}`,
               boxShadow: 'var(--shadow-sm)',
               borderRadius: 'var(--radius-md)',
               display: 'flex',
@@ -89,8 +89,8 @@ export default function AppSidebar() {
               marginBottom: 20
             }}
           >
-            <Terminal size={18} style={{ color: pathname === '/dstack' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} />
-            {!sidebarCollapsed && <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '0.04em', color: pathname === '/dstack' ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>DSTACK SHELL</span>}
+            <Terminal size={18} style={{ color: pathname === '/workspace' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} />
+            {!sidebarCollapsed && <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '0.04em', color: pathname === '/workspace' ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>DSTACK SHELL</span>}
           </Link>
 
           {/* Zone B: Workflow Stage Tracker */}

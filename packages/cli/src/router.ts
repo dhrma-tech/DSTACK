@@ -86,85 +86,28 @@ export async function route(command: ParsedCommand): Promise<{ stdout: string; s
 
 async function handleServeCommand(command: ParsedCommand, projectRoot: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   try {
-    const serverOptions = {
-      projectRoot,
-      ...(command.serveOptions?.host && { host: command.serveOptions.host }),
-      ...(command.serveOptions?.port && { port: command.serveOptions.port }),
-      ...(command.serveOptions?.tokenFile && { tokenFile: command.serveOptions.tokenFile }),
-      ...(command.serveOptions?.allowAbsolutePaths !== undefined && { allowAbsolutePaths: command.serveOptions.allowAbsolutePaths })
-    };
+    const { spawn } = await import('child_process');
     
-    const serverInfo = await startDstackApiServer(serverOptions);
+    console.log("🚀 Starting DStack Bridge Server...");
+    
+    const child = spawn('pnpm', ['--filter', '@dstack/server', 'dev'], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      shell: true
+    });
 
-    if (command.json) {
-      const envelope = {
-        ok: true,
-        data: {
-          serverUrl: serverInfo.baseUrl,
-          host: serverInfo.host,
-          port: serverInfo.port,
-          tokenFile: serverInfo.tokenFileRelative,
-          message: "Server started successfully"
-        },
-        warnings: [{
-          code: "LOCALHOST_ONLY",
-          message: "Server is bound to localhost only for security",
-          severity: "info" as const
-        }],
-        error: null,
-        meta: {
-          requestId: "serve-" + Date.now(),
-          timestamp: new Date().toISOString(),
-          apiVersion: "v1",
-          command: "serve"
-        }
-      };
+    return new Promise((resolve) => {
+      child.on('close', (code) => {
+        resolve({ stdout: `Server stopped with code ${code}`, stderr: "", exitCode: code ?? 0 });
+      });
       
-      return { stdout: JSON.stringify(envelope, null, 0), stderr: "", exitCode: 0 };
-    } else {
-      const output = [
-        "🚀 DStack API Server Started",
-        "",
-        `Local URL: ${serverInfo.baseUrl}`,
-        `Host: ${serverInfo.host}`,
-        `Port: ${serverInfo.port}`,
-        `Token File: ${serverInfo.tokenFileRelative}`,
-        "",
-        "⚠️  Server is localhost-only for security",
-        "📝 Use the token in .dstack/api/token for authentication",
-        "",
-        "Press Ctrl+C to stop the server"
-      ].join("\n");
-
-      // In non-JSON mode, we should keep the server running
-      // For now, return the startup info and exit
-      return { stdout: output, stderr: "", exitCode: 0 };
-    }
+      child.on('error', (err) => {
+        resolve({ stdout: "", stderr: `Failed to start server: ${err.message}`, exitCode: 1 });
+      });
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error starting server";
-    if (command.json) {
-      const envelope = {
-        ok: false,
-        data: null,
-        warnings: [],
-        error: {
-          code: "SERVER_START_FAILED",
-          message: errorMessage,
-          retryable: false,
-          requestId: "serve-" + Date.now()
-        },
-        meta: {
-          requestId: "serve-" + Date.now(),
-          timestamp: new Date().toISOString(),
-          apiVersion: "v1",
-          command: "serve"
-        }
-      };
-      
-      return { stdout: JSON.stringify(envelope, null, 0), stderr: "", exitCode: 1 };
-    } else {
-      return { stdout: "", stderr: `Failed to start server: ${errorMessage}`, exitCode: 1 };
-    }
+    return { stdout: "", stderr: `Failed to start server: ${errorMessage}`, exitCode: 1 };
   }
 }
 

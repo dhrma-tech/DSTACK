@@ -40,19 +40,23 @@ export class ToolExecutor {
   private calls = 0;
   private readonly gate: PermissionGate;
   constructor(private readonly registry: ToolRegistry, private readonly options: { projectRoot: string; config: DStackConfig; logger: SessionLogger | null; interactive: boolean }) {
-    this.gate = new PermissionGate({ interactive: options.interactive, dstackDir: options.config.dstackDir });
+    this.gate = new PermissionGate({ interactive: options.interactive, dstackDir: options.config.dstackDir, logger: options.logger });
   }
   async dispatch(toolCall: ToolCall): Promise<ToolResult> {
     this.calls += 1;
     if (this.calls > this.options.config.maxToolCalls) throw new PermissionError("Tool call limit exceeded");
     const permission = await this.gate.check(toolCall);
-    await this.options.logger?.event("info", "tool_permission", { tool: toolCall.name, permission });
+    await this.options.logger?.event("info", "tool-call", { toolName: toolCall.name, args: toolCall.input, gateDecision: permission });
     if (permission === "DENY") throw new PermissionError(`Tool call denied: ${toolCall.name}`);
     try {
       const result = await this.registry.get(toolCall.name).execute(toolCall.input, { projectRoot: this.options.projectRoot, config: this.options.config, logger: this.options.logger });
-      return await sanitizeToolResult(result, toolCall.name, this.options.logger);
+      const sanitized = await sanitizeToolResult(result, toolCall.name, this.options.logger);
+      await this.options.logger?.event("info", "tool-result", { toolName: toolCall.name, output: sanitized.output, success: sanitized.success, error: sanitized.error });
+      return sanitized;
     } catch (error) {
-      return { id: toolCall.id, name: toolCall.name, success: false, output: {}, error: error instanceof Error ? error.message : String(error) };
+      const result = { id: toolCall.id, name: toolCall.name, success: false, output: {}, error: error instanceof Error ? error.message : String(error) };
+      await this.options.logger?.event("info", "tool-result", { toolName: toolCall.name, output: {}, success: false, error: result.error });
+      return result;
     }
   }
 }

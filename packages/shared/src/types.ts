@@ -75,7 +75,7 @@ export interface SkillManifest {
 export interface SkillInvocation {
   skillName: string;
   inputs: Record<string, JsonValue>;
-  flags: { force: boolean; dryRun: boolean; noStream: boolean; model: string | null; provider: ProviderName | null; allowSecrets: boolean };
+  flags: { force: boolean; dryRun: boolean; noStream: boolean; model: string | null; provider: ProviderName | null; allowSecrets: boolean; jsonEvents: boolean };
   projectRoot: string;
 }
 

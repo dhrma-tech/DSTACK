@@ -78,7 +78,7 @@ export default function ArtifactDetailPage() {
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-warning)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <AlertTriangle size={12} /> Warnings
                 </h3>
-                {artifact.warnings.map((w, i) => (
+                {artifact.warnings.map((w: string, i: number) => (
                   <div key={i} style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>• {w}</div>
                 ))}
               </div>
@@ -94,7 +94,7 @@ export default function ArtifactDetailPage() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>{artifact.version} (Current)</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Now</span>
                 </div>
-                {otherVersions.map(v => (
+                {otherVersions.map((v: any) => (
                   <Link key={v.id} href={`/artifacts/${v.id}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', transition: 'background 0.1s' }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)')}
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}

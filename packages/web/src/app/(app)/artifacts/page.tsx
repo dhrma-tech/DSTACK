@@ -20,7 +20,7 @@ export default function ArtifactsPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {artifacts.map(art => {
+          {artifacts.map((art: any) => {
             const filename = art.relativePath.split('/').pop() || art.id;
             return (
               <div key={art.id} className="card card-interactive" style={{ padding: 20 }}>

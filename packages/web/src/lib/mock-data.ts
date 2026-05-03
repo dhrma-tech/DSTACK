@@ -65,6 +65,48 @@ export interface Artifact {
   content?: any;
 }
 
+export interface BenchmarkResult {
+  model: string;
+  quality: number;
+  latency: number;
+  cost: number;
+}
+
+export interface BenchmarkRun {
+  id: string;
+  suite: string;
+  date: string;
+  results: BenchmarkResult[];
+}
+
+export interface Learning {
+  id: string;
+  topic: string;
+  insight: string;
+  source: string;
+  createdAt: string;
+}
+
+export interface BrowserSnapshot {
+  id: string;
+  url: string;
+  title: string;
+  createdAt: string;
+  screenshot: string | null;
+  promptInjectionDetected: boolean;
+  consoleErrors: number;
+}
+
+export interface DeployRun {
+  id: string;
+  type: string;
+  status: string;
+  verdict: string;
+  environment: string;
+  startedAt: string;
+  healthCheck: string;
+}
+
 export interface WorkflowNode {
   id: string;
   nodeType: "skill" | "artifact" | "gate";

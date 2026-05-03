@@ -29,7 +29,7 @@ export default function OnboardingPage() {
         <div style={{ width: '100%', maxWidth: '800px', display: 'grid', gridTemplateColumns: '250px 1fr', gap: 'var(--spacing-xxl)' }}>
           {/* Progress Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {steps.map((s, i) => (
+            {steps.map((s: any, i: number) => (
               <div key={s.title} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                 <div style={{ 
                   width: '28px', 

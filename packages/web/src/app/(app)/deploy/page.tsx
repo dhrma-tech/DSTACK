@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/StatusBadge';
 import { useApp } from '@/lib/app-context';
+import { type DeployRun } from '@/lib/mock-data';
 import { Rocket, Snowflake, ShieldCheck, AlertTriangle, CheckCircle2, History, Clock } from 'lucide-react';
 
 export default function DeployPage() {
@@ -67,7 +68,7 @@ export default function DeployPage() {
                 <History size={12} /> Deploy History
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {deployRuns.map(run => (
+                {deployRuns.map((run: DeployRun) => (
                   <div key={run.id} style={{ paddingBottom: 12, borderBottom: '1px solid var(--color-border-soft)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{run.type}</span>

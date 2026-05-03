@@ -18,9 +18,9 @@ export default function SkillsPage() {
     .filter(s => showHidden || !s.hidden)
     .filter(s => s.name.includes(search.toLowerCase()) || s.command.includes(search.toLowerCase()));
 
-  const grouped = STAGE_ORDER.map(stage => ({
+  const grouped = STAGE_ORDER.map((stage: string) => ({
     stage,
-    skills: filtered.filter(s => s.stage === stage),
+    skills: filtered.filter((s: any) => s.stage === stage),
   })).filter(g => g.skills.length > 0);
 
   const stageIcon = (stage: string) => {
@@ -55,7 +55,7 @@ export default function SkillsPage() {
         </div>
 
         {/* Grouped Skills */}
-        {grouped.map(group => (
+        {grouped.map((group: any) => (
           <div key={group.stage} style={{ marginBottom: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: 'var(--color-text-muted)' }}>
               {stageIcon(group.stage)}
@@ -63,7 +63,7 @@ export default function SkillsPage() {
               <span style={{ fontSize: 11 }}>({group.skills.length})</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border-soft)' }}>
-              {group.skills.map(skill => (
+              {group.skills.map((skill: any) => (
                 <div key={skill.name} style={{
                   display: 'grid', gridTemplateColumns: '2fr 1fr 100px 80px',
                   alignItems: 'center', gap: 16, padding: '14px 20px',
