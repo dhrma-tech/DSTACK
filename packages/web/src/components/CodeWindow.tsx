@@ -1,11 +1,16 @@
+'use client';
+
 import React from 'react';
+import { motion } from 'framer-motion';
 
 interface CodeWindowProps {
   title?: string;
   code: string;
+  diffRows?: Array<{ kind: 'context' | 'add' | 'delete'; lineNumber: number; text: string }>;
 }
 
-const CodeWindow: React.FC<CodeWindowProps> = ({ title = "terminal", code }) => {
+const CodeWindow: React.FC<CodeWindowProps> = ({ title = "terminal", code, diffRows }) => {
+  const rows = diffRows ?? code.split('\n').map((text, index) => ({ kind: 'context' as const, lineNumber: index + 1, text }));
   return (
     <div className="code-window">
       <div className="code-header">
@@ -23,18 +28,24 @@ const CodeWindow: React.FC<CodeWindowProps> = ({ title = "terminal", code }) => 
       <div className="code-content">
         <pre style={{ margin: 0 }}>
           <code>
-            {code.split('\n').map((line, i) => (
-              <div key={i} style={{ display: 'flex', gap: '16px' }}>
+            {rows.map((row, i) => (
+              <motion.div
+                key={`${row.lineNumber}-${i}-${row.text}`}
+                initial={row.kind === 'add' ? { backgroundColor: 'rgba(16,185,129,0.32)' } : row.kind === 'delete' ? { backgroundColor: 'rgba(239,68,68,0.22)', opacity: 1 } : false}
+                animate={row.kind === 'add' ? { backgroundColor: 'rgba(16,185,129,0)' } : row.kind === 'delete' ? { backgroundColor: 'rgba(239,68,68,0.05)', opacity: 0.72 } : {}}
+                transition={{ duration: row.kind === 'add' ? 1.5 : 0.5 }}
+                style={{ display: 'flex', gap: '16px', textDecoration: row.kind === 'delete' ? 'line-through' : 'none', color: row.kind === 'add' ? 'var(--color-success)' : row.kind === 'delete' ? 'var(--color-error)' : undefined }}
+              >
                 <span style={{ 
                   color: 'var(--color-text-muted)', 
                   width: '20px', 
                   textAlign: 'right', 
                   userSelect: 'none' 
-                }}>{i + 1}</span>
-                <span style={{ color: line.trim().startsWith('$') ? 'var(--color-primary)' : 'inherit' }}>
-                  {line}
+                }}>{row.lineNumber}</span>
+                <span style={{ color: row.text.trim().startsWith('$') ? 'var(--color-primary)' : 'inherit' }}>
+                  {row.kind === 'add' ? '+ ' : row.kind === 'delete' ? '- ' : '  '}{row.text}
                 </span>
-              </div>
+              </motion.div>
             ))}
           </code>
         </pre>

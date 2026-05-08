@@ -153,7 +153,7 @@ proModel: fake-pro-model
     expect(parsed.meta).toHaveProperty("requestId");
     expect(parsed.meta).toHaveProperty("timestamp");
     expect(parsed.meta).toHaveProperty("apiVersion", "v1");
-    expect(parsed.meta).toHaveProperty("command", "/office-hours");
+    expect(parsed.meta).toHaveProperty("command", "office-hours");
     
     // If successful, validate skill result structure
     if (parsed.ok) {

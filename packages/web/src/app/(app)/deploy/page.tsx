@@ -28,9 +28,9 @@ export default function DeployPage() {
               <h2 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-sans)', marginBottom: 16 }}>Deployment Readiness</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
-                  { label: 'QA Report', passed: false, reason: 'Not yet run — execute /qa first' },
-                  { label: 'Review Completed', passed: false, reason: 'Not yet run — execute /review first' },
-                  { label: 'Ship Checklist', passed: false, reason: 'Not yet run — execute /ship first' },
+                  { label: 'QA Report', passed: false, reason: 'Not yet run — execute qa first' },
+                  { label: 'Review Completed', passed: false, reason: 'Not yet run — execute review first' },
+                  { label: 'Ship Checklist', passed: false, reason: 'Not yet run — execute ship first' },
                   { label: 'No Stale Artifacts', passed: true, reason: '' },
                 ].map(gate => (
                   <div key={gate.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 'var(--radius-md)', backgroundColor: gate.passed ? 'rgba(16,185,129,0.04)' : 'rgba(245,158,11,0.04)', border: `1px solid ${gate.passed ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'}` }}>

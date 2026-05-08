@@ -121,7 +121,7 @@ export class SkillAuditor {
         severity: "warning",
         skillName,
         check: "phase2-central-shim",
-        message: `/${skillName} still delegates to phase2SkillHandler; replace with a skill-specific handler when hardening this skill.`
+        message: `${skillName} still delegates to phase2SkillHandler; replace with a skill-specific handler when hardening this skill.`
       });
     }
 

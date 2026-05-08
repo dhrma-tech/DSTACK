@@ -44,14 +44,15 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
     .option("verbose", { type: "boolean", default: false })
     .option("allow-secrets", { type: "boolean", default: false })
     .parse();
-  const skillName = parsed._.map(String)[0] ?? null;
+  const rawSkillName = parsed._.map(String)[0] ?? null;
+  const skillName = normalizeSkillName(rawSkillName);
   const reserved = new Set(["_", "$0", "help", "version", "list-skills", "skill-check", "serve", "host", "port", "token-file", "allow-absolute-paths", "force", "dry-run", "no-stream", "model", "provider", "json", "json-events", "verbose", "allow-secrets"]);
   const inputs: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!reserved.has(key) && isJsonValue(value)) inputs[key] = value;
   }
   return {
-    help: parsed.help === true || (!skillName && parsed["list-skills"] !== true && parsed["skill-check"] !== true && parsed.serve !== true && parsed.version !== true),
+    help: parsed.help === true || (!rawSkillName && parsed["list-skills"] !== true && parsed["skill-check"] !== true && parsed.serve !== true && parsed.version !== true),
     version: parsed.version === true,
     listSkills: parsed["list-skills"] === true,
     skillCheck: parsed["skill-check"] === true,
@@ -97,6 +98,11 @@ export async function parseArgv(argv = hideBin(process.argv), projectRoot = proc
 
 function isProviderName(value: unknown): value is ProviderName {
   return value === "gemini" || value === "fake";
+}
+
+function normalizeSkillName(value: string | null): string | null {
+  if (!value) return null;
+  return value.startsWith("/") ? value.slice(1) : value;
 }
 
 function isJsonValue(value: unknown): value is JsonValue {

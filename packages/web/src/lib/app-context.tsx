@@ -4,7 +4,16 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import {
   MOCK_PROJECT, MOCK_SKILLS, MOCK_RUNS, MOCK_ARTIFACTS, MOCK_WORKFLOW,
   MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS, MOCK_EXECUTION_SESSION,
-  type BenchmarkRun, type Learning, type BrowserSnapshot, type DeployRun
+  type Artifact,
+  type BenchmarkRun,
+  type BrowserSnapshot,
+  type DeployRun,
+  type ExecutionTurn,
+  type Learning,
+  type Project,
+  type Skill,
+  type SkillRun,
+  type WorkflowGraph
 } from './mock-data';
 
 interface AppState {
@@ -65,39 +74,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (projRes) {
+          const backendProject = projRes as {
+            name?: string;
+            safetyMode?: Project['safetyMode']['mode'];
+            providerMode?: string;
+            branch?: string;
+            head?: string;
+            stage?: string;
+          };
           setProject(prev => ({
             ...prev,
-            name: projRes.name,
-            safetyMode: { mode: projRes.safetyMode, activeSession: null },
-            provider: { current: projRes.providerMode === 'FAKE' ? 'fake' : 'gemini', isConfigured: true },
-            repo: { branch: projRes.branch, head: projRes.head, hasUncommittedChanges: false }
+            name: backendProject.name ?? prev.name,
+            safetyMode: { mode: backendProject.safetyMode ?? prev.safetyMode.mode, reason: prev.safetyMode.reason },
+            provider: { current: backendProject.providerMode === 'FAKE' ? 'fake' : 'gemini', geminiConfigured: true }
           }));
           
           setWorkflow(prev => ({
             ...prev,
-            currentStage: projRes.stage || prev.currentStage
+            currentStage: backendProject.stage || prev.currentStage
           }));
         }
 
         if (skillsRes && Array.isArray(skillsRes)) {
-          setSkills(skillsRes);
+          setSkills(skillsRes as unknown as Skill[]);
         }
 
         if (runsRes && Array.isArray(runsRes)) {
-          setRuns(runsRes);
+          setRuns(runsRes as unknown as SkillRun[]);
         }
 
         if (artifactsRes && Array.isArray(artifactsRes)) {
           // Map backend artifacts to UI artifacts
-          setArtifacts(artifactsRes.map(a => ({
+          setArtifacts((artifactsRes as Array<{
+            skillName: string;
+            timestamp: string;
+            verdict?: Artifact['verdict'];
+            path: string;
+            content?: Artifact['content'];
+          }>).map(a => ({
             id: `${a.skillName}-${a.timestamp}`,
             skillName: a.skillName,
+            artifactType: 'skill-output',
             version: 'v1',
-            status: a.verdict === 'PASS' ? 'stable' : 'error',
+            isLatest: true,
             verdict: a.verdict || 'FAIL',
             createdAt: a.timestamp,
             relativePath: a.path.split('.dstack/')[1] || a.path,
-            summary: `${a.verdict} result from /${a.skillName}`,
+            summary: `${a.verdict} result from ${a.skillName}`,
+            warnings: [],
             content: a.content || { note: 'Artifact data available on click' }
           })));
         }

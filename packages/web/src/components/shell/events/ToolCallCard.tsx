@@ -5,8 +5,8 @@ import { Terminal, Check, X, Loader2 } from 'lucide-react';
 
 interface ToolCallCardProps {
   toolName: string;
-  args: any;
-  result?: any;
+  args: Record<string, unknown>;
+  result?: { output?: unknown; stdout?: string; stderr?: string; code?: number; success?: boolean };
   status: 'pending' | 'success' | 'error';
 }
 
@@ -35,9 +35,18 @@ export default function ToolCallCard({ toolName, args, result, status }: ToolCal
 
       {result && (
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border-soft)', paddingTop: 8 }}>
-           <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{typeof result.output === 'string' ? result.output : JSON.stringify(result.output, null, 2)}</pre>
+           <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{formatResult(result)}</pre>
         </div>
       )}
     </div>
   );
+}
+
+function formatResult(result: ToolCallCardProps['result']): string {
+  if (!result) return '';
+  if (typeof result.output === 'string') return result.output;
+  if (typeof result.stdout === 'string' || typeof result.stderr === 'string') {
+    return [result.stdout, result.stderr].filter(Boolean).join('\n');
+  }
+  return JSON.stringify(result.output ?? result, null, 2);
 }

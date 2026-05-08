@@ -41,11 +41,11 @@ export class CSOEngine {
       scopeAssessment: "Scope is disciplined when stage gates remain enforced.",
       timelineRealism: "ON_TRACK",
       nextCycleRecommendations: [
-        { recommendation: "Run /health before ship readiness decisions.", affectedSkills: ["health", "ship"], priority: "HIGH" },
-        { recommendation: "Capture lessons with /retro and /setup-memory.", affectedSkills: ["retro", "setup-memory"], priority: "MEDIUM" }
+        { recommendation: "Run health before ship readiness decisions.", affectedSkills: ["health", "ship"], priority: "HIGH" },
+        { recommendation: "Capture lessons with retro and setup-memory.", affectedSkills: ["retro", "setup-memory"], priority: "MEDIUM" }
       ],
       artifactsReviewed: reviewed,
-      summary: lowContext ? "Strategic review has limited context; run /autoplan before relying on this assessment." : "The project is directionally healthy with clear operational gates."
+      summary: lowContext ? "Strategic review has limited context; run autoplan before relying on this assessment." : "The project is directionally healthy with clear operational gates."
     };
   }
 }

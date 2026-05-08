@@ -129,7 +129,7 @@ export default function RunDetailPage() {
             {run.warnings.length > 0 && (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-warning)', marginBottom: 4, textTransform: 'uppercase' }}>Warnings</div>
-                {run.warnings.map((w, i) => (
+                {run.warnings.map((w: string, i: number) => (
                   <div key={i} style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>• {w}</div>
                 ))}
               </div>

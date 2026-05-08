@@ -95,7 +95,7 @@ async function runPhase2Skill(skillName: string, context: SkillExecutionContext)
     case "cso":
       return cso(context);
     default:
-      throw new ValidationError(`No Phase 2 handler for /${skillName}`);
+      throw new ValidationError(`No Phase 2 handler for ${skillName}`);
   }
 }
 
@@ -135,13 +135,13 @@ async function health(context: SkillExecutionContext): Promise<JsonObject> {
     healthScore: dashboard.readinessScore,
     healthVerdict,
     computedAt: dashboard.computedAt,
-    staleArtifacts: dashboard.staleArtifacts.map((entry) => ({ skillName: entry.skillName, lastRunAt: entry.artifactTimestamp, stalenessReason: `Stale because /${entry.staleBecauseOf} was re-run.`, severity: entry.severity })),
+      staleArtifacts: dashboard.staleArtifacts.map((entry) => ({ skillName: entry.skillName, lastRunAt: entry.artifactTimestamp, stalenessReason: `Stale because ${entry.staleBecauseOf} was re-run.`, severity: entry.severity })),
     openGates: dashboard.openGates,
     neverRunSkills: dashboard.neverRunSkills,
     dependencyAudit: { vulnerabilities: 0, critical: 0, high: 0, auditCommand: "skipped in offline-safe health check" },
     gitHealth: { commitFrequency: "infrequent", lastCommitAt: log.stdout.trim() || nowIso(), uncommittedChanges: status.stdout.trim().length > 0 },
-    topRecommendations: dashboard.topBlockers.length > 0 ? dashboard.topBlockers : ["Run /qa before /ship.", "Run /context-save after shipping."],
-    summary: dashboard.overallReadiness === "UNKNOWN" ? "Project not started - run /office-hours to begin." : `Project readiness is ${dashboard.overallReadiness}.`,
+      topRecommendations: dashboard.topBlockers.length > 0 ? dashboard.topBlockers : ["Run qa before ship.", "Run context-save after shipping."],
+      summary: dashboard.overallReadiness === "UNKNOWN" ? "Project not started - run office-hours to begin." : `Project readiness is ${dashboard.overallReadiness}.`,
     scoringMethod: "100 minus missing required gates, failed gates, and stale artifact penalties.",
     dashboard: dashboard as unknown as JsonObject
   });
@@ -252,8 +252,8 @@ async function landAndDeploy(context: SkillExecutionContext): Promise<JsonObject
   if (await manager.isFrozen()) blockers.push("Deploy freeze is active.");
   const ship = await context.artifactStore.readLatest("ship");
   const qa = await context.artifactStore.readLatest("qa");
-  if (!ship || ship.verdict !== "PASS") blockers.push("/ship artifact must be PASS.");
-  if (!qa || qa.verdict !== "PASS") blockers.push("/qa artifact must be PASS.");
+      if (!ship || ship.verdict !== "PASS") blockers.push("ship artifact must be PASS.");
+      if (!qa || qa.verdict !== "PASS") blockers.push("qa artifact must be PASS.");
   const config = await manager.readConfig().catch(() => null);
   if (!config) blockers.push("Deploy config missing. Run /setup-deploy first.");
   if (env === "production") throw new PermissionError("Production deploy requires explicit interactive approval and cannot be bypassed with --force.");
@@ -397,7 +397,7 @@ async function retro(context: SkillExecutionContext): Promise<JsonObject> {
   ];
   const store = new LearningStore({ dstackDir: context.config.dstackDir, projectId: context.config.projectRoot });
   for (const entry of learningEntries) await store.add({ ...entry, originalText: entry.insight, wasRephrased: false, source: "retro" });
-  return mark(context, { cycleStart: artifacts["office-hours"]?.createdAt ?? nowIso(), cycleEnd: artifacts.ship?.createdAt ?? nowIso(), estimatedDurationDays: 0, wentWell: ["Workflow artifacts were preserved.", "Ship gates are explicit."], wentPoorly: ["Some checks may still be simulated offline.", "Review loops need continued discipline."], processMetrics: { planRevisions: Math.max(0, (await context.artifactStore.list("autoplan")).length - 1), qaFailures, investigateRuns: (await context.artifactStore.list("investigate")).length, designIterations: (await context.artifactStore.list("design-consultation")).length, reviewRejections: 0 }, keyDecisions: [{ decision: "Use fake provider for offline development.", outcome: "GOOD", rationale: "Keeps workflow moving without API quota." }], learningEntries, nextCycleRecommendations: ["Run /health before /ship.", "Run /setup-memory --import-retro before the next /office-hours."] });
+  return mark(context, { cycleStart: artifacts["office-hours"]?.createdAt ?? nowIso(), cycleEnd: artifacts.ship?.createdAt ?? nowIso(), estimatedDurationDays: 0, wentWell: ["Workflow artifacts were preserved.", "Ship gates are explicit."], wentPoorly: ["Some checks may still be simulated offline.", "Review loops need continued discipline."], processMetrics: { planRevisions: Math.max(0, (await context.artifactStore.list("autoplan")).length - 1), qaFailures, investigateRuns: (await context.artifactStore.list("investigate")).length, designIterations: (await context.artifactStore.list("design-consultation")).length, reviewRejections: 0 }, keyDecisions: [{ decision: "Use fake provider for offline development.", outcome: "GOOD", rationale: "Keeps workflow moving without API quota." }], learningEntries, nextCycleRecommendations: ["Run health before ship.", "Run setup-memory --import-retro before the next office-hours."] });
 }
 
 async function makePdf(context: SkillExecutionContext): Promise<JsonObject> {
@@ -439,7 +439,7 @@ async function dstackUpgrade(context: SkillExecutionContext): Promise<JsonObject
 async function codex(context: SkillExecutionContext): Promise<JsonObject> {
   const sourceArtifact = requiredStr(context, "artifact");
   const artifact = await context.artifactStore.readLatest(sourceArtifact);
-  if (!artifact) throw new ArtifactError(`Missing artifact for /codex: /${sourceArtifact}`);
+  if (!artifact) throw new ArtifactError(`Missing artifact for codex: ${sourceArtifact}`);
   const integration = new CodexIntegration({ projectRoot: context.config.projectRoot });
   const prompt = integration.formatPrompt(sourceArtifact, artifact.content, str(context.invocation.inputs.task, null));
   const installed = context.generatedBy ? true : await integration.isInstalled();
@@ -481,7 +481,7 @@ function mark(context: SkillExecutionContext, output: JsonObject): JsonObject {
 
 function requiredStr(context: SkillExecutionContext, key: string): string {
   const value = str(context.invocation.inputs[key], null);
-  if (!value) throw new ValidationError(`/${context.manifest.name} requires --${key}`);
+  if (!value) throw new ValidationError(`${context.manifest.name} requires --${key}`);
   return value;
 }
 
@@ -527,11 +527,11 @@ function dstackMdContent(memory: ProjectMemory): string {
     `- Constraints: ${memory.constraints.length > 0 ? memory.constraints.join("; ") : "Prefer fake-provider mode for offline checks."}`,
     "",
     "## Skill Routing",
-    "- New product or feature idea: `/office-hours` then `/autoplan`.",
+    "- New product or feature idea: `office-hours` then `autoplan`.",
     "- Plan quality concern: `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/plan-devex-review`.",
     "- Apply review feedback: `/plan-tune`.",
-    "- Implementation review: `/review` then `/qa`.",
-    "- Release readiness: `/ship` then `/health`.",
+    "- Implementation review: `review` then `qa`.",
+    "- Release readiness: `ship` then `health`.",
     "- Deployment: `/setup-deploy`, `/canary`, `/land-and-deploy`.",
     "- Browser analysis or automation: `/browse`, `/landing-report`, `/scrape`, `/pair-agent`.",
     "- Persistent memory: `/learn`, `/retro`, `/setup-memory --import-retro`.",
@@ -539,7 +539,7 @@ function dstackMdContent(memory: ProjectMemory): string {
     "## Safety",
     "- Use `/guard` for read-only sessions.",
     "- Use `/careful` when every tool call should require approval.",
-    "- Use `/freeze` before deploy freeze windows and `/unfreeze` when ready.",
+    "- Use `freeze` before deploy freeze windows and `unfreeze` when ready.",
     ""
   ].join("\n");
 }

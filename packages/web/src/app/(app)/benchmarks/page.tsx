@@ -24,7 +24,7 @@ export default function BenchmarksPage() {
           <EmptyState
             icon={<BarChart3 size={48} strokeWidth={1} />}
             title="No benchmarks run"
-            description="Use the CLI to run your first benchmark: pnpm ds -- /benchmark"
+            description="Use the CLI to run your first benchmark: pnpm ds -- benchmark"
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

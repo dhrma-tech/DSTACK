@@ -38,6 +38,6 @@ export class CodexIntegration {
   }
 
   formatPrompt(sourceArtifact: string, artifact: JsonObject, taskId: string | null): string {
-    return [`Implement the DStack task from /${sourceArtifact}.`, taskId ? `Focus task: ${taskId}.` : "Pick the most actionable scoped task.", JSON.stringify(artifact, null, 2)].join("\n\n");
+    return [`Implement the DStack task from ${sourceArtifact}.`, taskId ? `Focus task: ${taskId}.` : "Pick the most actionable scoped task.", JSON.stringify(artifact, null, 2)].join("\n\n");
   }
 }

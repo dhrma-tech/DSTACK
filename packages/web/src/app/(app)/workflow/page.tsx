@@ -78,7 +78,7 @@ export default function WorkflowPage() {
         {workflow.suggestedNextSkills.length > 0 && (
           <div style={{ marginTop: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-primary-soft)', border: '1px solid rgba(230,126,90,0.15)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>Suggested next: </span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{workflow.suggestedNextSkills.map((s: string) => `/${s}`).join(', ')}</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{workflow.suggestedNextSkills.join(', ')}</span>
           </div>
         )}
       </div>

@@ -315,8 +315,8 @@ async function runLandAndDeploy(context: SkillExecutionContext): Promise<JsonObj
   
   const ship = await context.artifactStore.readLatest("ship");
   const qa = await context.artifactStore.readLatest("qa");
-  if (!ship || ship.verdict !== "PASS") blockers.push("/ship artifact must be PASS.");
-  if (!qa || qa.verdict !== "PASS") blockers.push("/qa artifact must be PASS.");
+  if (!ship || ship.verdict !== "PASS") blockers.push("ship artifact must be PASS.");
+  if (!qa || qa.verdict !== "PASS") blockers.push("qa artifact must be PASS.");
   const config = await manager.readConfig().catch(() => null);
   if (!config) blockers.push("Deploy config missing. Run /setup-deploy first.");
   
@@ -417,7 +417,7 @@ async function runHealth(context: SkillExecutionContext): Promise<JsonObject> {
   const recommendations = topRecommendations([
     ...dashboard.topBlockers,
     skillAudit.errors.length > 0 ? `Fix ${skillAudit.errors.length} skill-check error(s).` : null,
-    freezeState.frozen ? "Review /freeze state before deploying." : null,
+    freezeState.frozen ? "Review freeze state before deploying." : null,
     learningCount === 0 ? "Capture durable project lessons with /learn." : null,
     !routing ? "Run /setup-memory to create DSTACK.md prompt routing context." : null
   ]);
@@ -564,7 +564,7 @@ async function runCareful(context: SkillExecutionContext): Promise<JsonObject> {
     gitStatus.stdout.trim() ? "Uncommitted work is present; review diffs before write or deploy actions." : null,
     deployState.frozen ? `Deploy freeze is active${deployState.reason ? `: ${deployState.reason}` : "."}` : null,
     dashboard.staleArtifacts.length > 0 ? `${dashboard.staleArtifacts.length} stale artifact(s) should be refreshed before trusting downstream decisions.` : null,
-    dashboard.openGates.length > 0 ? `Open workflow gates: ${dashboard.openGates.map((gate) => `/${gate}`).join(", ")}.` : null
+      dashboard.openGates.length > 0 ? `Open workflow gates: ${dashboard.openGates.join(", ")}.` : null
   ].filter((item): item is string => Boolean(item));
   return mark(context, {
     previousMode: previous.mode,
@@ -575,10 +575,10 @@ async function runCareful(context: SkillExecutionContext): Promise<JsonObject> {
     riskList: risks,
     unsafeOperations: ["deploy", "git write operations", "file writes", "shell execution"].map((operation) => `${operation} requires explicit approval while CAREFUL is active`),
     recommendedChecks: topRecommendations([
-      "Run /health before ship or deploy decisions.",
+      "Run health before ship or deploy decisions.",
       gitStatus.stdout.trim() ? "Inspect git status and diff." : null,
       dashboard.staleArtifacts.length > 0 ? "Re-run stale review or QA skills before proceeding." : null,
-      deployState.frozen ? "Resolve /freeze before deployment." : null
+      deployState.frozen ? "Resolve freeze before deployment." : null
     ]),
     checked: ["safety mode", "git status", "artifact staleness", "workflow gates", "deploy freeze"],
     skipped: ["no write/execute actions were run"]
@@ -833,7 +833,7 @@ async function runCanary(context: SkillExecutionContext): Promise<JsonObject> {
 async function runCodex(context: SkillExecutionContext): Promise<JsonObject> {
   const sourceArtifact = requiredStr(context, "artifact");
   const artifact = await context.artifactStore.readLatest(sourceArtifact);
-  if (!artifact) throw new ArtifactError(`/codex could not find artifact /${sourceArtifact}.`);
+  if (!artifact) throw new ArtifactError(`codex could not find artifact ${sourceArtifact}.`);
   const taskId = str(context.invocation.inputs.task, null);
   const integration = new CodexIntegration({ projectRoot: context.config.projectRoot });
   const prompt = integration.formatPrompt(sourceArtifact, artifact.content, taskId);
@@ -1272,8 +1272,8 @@ function repeatedArtifactIssues(entries: Array<{ skillName: string; content: Jso
 
 function retroLearningEntries(repeatedIssues: string[], qaFailures: number, reviewRejections: number): Array<{ topic: string; insight: string; appliesTo: string[] }> {
   const entries: Array<{ topic: string; insight: string; appliesTo: string[] }> = [];
-  if (qaFailures > 0) entries.push({ topic: "qa", insight: `QA recorded ${qaFailures} failure(s); add targeted checks before the next /ship gate.`, appliesTo: ["qa", "review"] });
-  if (reviewRejections > 0) entries.push({ topic: "review", insight: `Review artifacts contained ${reviewRejections} rejection or must-fix signal(s); address them with /plan-tune before implementation work expands.`, appliesTo: ["plan-tune", "review"] });
+  if (qaFailures > 0) entries.push({ topic: "qa", insight: `QA recorded ${qaFailures} failure(s); add targeted checks before the next ship gate.`, appliesTo: ["qa", "review"] });
+  if (reviewRejections > 0) entries.push({ topic: "review", insight: `Review artifacts contained ${reviewRejections} rejection or must-fix signal(s); address them with plan-tune before implementation work expands.`, appliesTo: ["plan-tune", "review"] });
   for (const issue of repeatedIssues.slice(0, 2)) entries.push({ topic: "repeated-issue", insight: `Repeated issue observed across artifacts: ${issue}.`, appliesTo: ["retro", "health"] });
   if (entries.length === 0) entries.push({ topic: "shipping", insight: "This cycle had no repeated artifact issues; keep the current review and QA cadence.", appliesTo: ["retro", "health"] });
   return entries;
@@ -1292,9 +1292,9 @@ function durationDays(start: string, end: string): number {
 
 function retroWentWell(artifacts: Record<string, JsonObject>, learningCount: number): string[] {
   const items = [
-    artifacts.ship ? "/ship artifact exists for this cycle." : null,
-    artifacts.qa?.overallVerdict === "PASS" ? "/qa passed before ship." : null,
-    artifacts.review ? "/review produced a gate artifact." : null,
+    artifacts.ship ? "ship artifact exists for this cycle." : null,
+    artifacts.qa?.overallVerdict === "PASS" ? "qa passed before ship." : null,
+    artifacts.review ? "review produced a gate artifact." : null,
     learningCount > 0 ? `${learningCount} prior learning(s) were available.` : null
   ].filter((item): item is string => Boolean(item));
   return items.length > 0 ? items : ["Enough artifact history exists to start a retrospective."];
@@ -1317,17 +1317,17 @@ function keyDecisionsFromArtifacts(artifacts: Record<string, JsonObject>): JsonO
   for (const item of stringArray(artifacts.autoplan?.assumptionsMade).slice(0, 3)) {
     decisions.push({ decision: item, outcome: "NEUTRAL", rationale: "Autoplan assumption carried into cycle execution." });
   }
-  if (decisions.length === 0) decisions.push({ decision: "No explicit decision artifact found", outcome: "NEUTRAL", rationale: "Add decisions through /learn or /setup-memory for better future retros." });
+  if (decisions.length === 0) decisions.push({ decision: "No explicit decision artifact found", outcome: "NEUTRAL", rationale: "Add decisions through learn or setup-memory for better future retros." });
   return decisions;
 }
 
 function retroRecommendations(qaFailures: number, reviewRejections: number, repeatedIssues: string[], artifacts: Record<string, JsonObject>): string[] {
   return topRecommendations([
-    qaFailures > 0 ? "Run /investigate immediately after failing /qa and capture the fix path." : null,
-    reviewRejections > 0 ? "Use /plan-tune before re-running failed review gates." : null,
-    repeatedIssues.length > 0 ? "Promote repeated retro issues into /learn so future prompts see them." : null,
-    !artifacts.health ? "Run /health before the next cycle begins." : null,
-    !artifacts["setup-memory"] ? "Run /setup-memory --import-retro to refresh DSTACK.md routing context." : null
+    qaFailures > 0 ? "Run investigate immediately after failing qa and capture the fix path." : null,
+    reviewRejections > 0 ? "Use plan-tune before re-running failed review gates." : null,
+    repeatedIssues.length > 0 ? "Promote repeated retro issues into learn so future prompts see them." : null,
+    !artifacts.health ? "Run health before the next cycle begins." : null,
+    !artifacts["setup-memory"] ? "Run setup-memory --import-retro to refresh DSTACK.md routing context." : null
   ]);
 }
 
@@ -1419,10 +1419,10 @@ function buildDstackBlock(memory: ProjectMemory): string {
     `Project: ${memory.projectName}`,
     "",
     "## Routing Hints",
-    "- Planning or scope changes: run /office-hours, /autoplan, then review gates.",
-    "- Implementation risk: run /review and /qa before /ship.",
+    "- Planning or scope changes: run office-hours, autoplan, then review gates.",
+    "- Implementation risk: run review and qa before ship.",
     "- Repeated project lessons: search /learn before starting a new cycle.",
-    "- Deployment decisions: check /health and /freeze before /land-and-deploy.",
+    "- Deployment decisions: check health and freeze before land-and-deploy.",
     "",
     "## Goals",
     ...listOrPlaceholder(memory.goals),
@@ -1771,7 +1771,7 @@ function mark(context: SkillExecutionContext, output: JsonObject): JsonObject {
 
 function requiredStr(context: SkillExecutionContext, key: string): string {
   const value = str(context.invocation.inputs[key], null);
-  if (!value) throw new ValidationError(`/${context.manifest.name} requires --${key}`);
+  if (!value) throw new ValidationError(`${context.manifest.name} requires --${key}`);
   return value;
 }
 

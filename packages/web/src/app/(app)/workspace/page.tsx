@@ -20,10 +20,14 @@ export default function WorkspacePage() {
   const handleRun = () => {
     if (!inputValue.trim()) return;
     
+    const firstToken = inputValue.trim().split(' ')[0];
+    const explicitSkillName = firstToken.startsWith('/') ? firstToken.substring(1) : firstToken;
+    const isSkillCommand = inputValue.startsWith('/') || skills.some((skill) => skill.name === explicitSkillName);
+
     // Check if it's a skill command
-    if (inputValue.startsWith('/')) {
+    if (isSkillCommand) {
       const parts = inputValue.split(' ');
-      const skillName = parts[0].substring(1);
+      const skillName = parts[0].replace(/^\//, '');
       const args: Record<string, string> = {};
       
       // Basic arg parsing
@@ -146,8 +150,8 @@ export default function WorkspacePage() {
               {status === 'idle' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {[
-                    { label: 'Run Office Hours', desc: 'Brainstorm product strategy with AI.', cmd: '/office-hours --idea "Build a SaaS"' },
-                    { label: 'Update Auto Plan', desc: 'Synchronize project state with current PRs.', cmd: '/autoplan --source "roadmap.json"' },
+                    { label: 'Run Office Hours', desc: 'Brainstorm product strategy with AI.', cmd: 'office-hours --idea "Build a SaaS"' },
+                    { label: 'Update Auto Plan', desc: 'Synchronize project state with current PRs.', cmd: 'autoplan --source "roadmap.json"' },
                   ].map((s: any) => (
                     <div key={s.label} className="card card-interactive" style={{ padding: 14, cursor: 'pointer' }}
                       onClick={() => setInputValue(s.cmd)}>

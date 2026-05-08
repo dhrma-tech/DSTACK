@@ -46,9 +46,9 @@ export class PDFGenerator {
     const pages = [
       [`DStack Report: ${title}`, `Generated: ${new Date().toISOString()}`, `Artifacts: ${included.join(", ") || "none"}`],
       summaries.length > 1
-        ? ["Table of Contents", ...summaries.map((item, index) => `${index + 1}. /${item.name} - page ${index + 3}`)]
-        : ["Report Contents", ...summaries.map((item) => `/${item.name}`)],
-      ...summaries.map((item, index) => [`Section ${index + 1}: /${item.name}`, item.summary, ...item.details])
+        ? ["Table of Contents", ...summaries.map((item, index) => `${index + 1}. ${item.name} - page ${index + 3}`)]
+        : ["Report Contents", ...summaries.map((item) => item.name)],
+      ...summaries.map((item, index) => [`Section ${index + 1}: ${item.name}`, item.summary, ...item.details])
     ];
     const pdf = minimalPdf(pages);
     await writeFile(pdfPath, pdf, "binary");

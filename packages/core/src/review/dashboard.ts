@@ -85,7 +85,7 @@ export class ReviewDashboard {
         lastRunAt: artifact?.createdAt ?? null,
         verdict: artifact?.verdict ?? null,
         isStale: Boolean(stale),
-        stalenessReason: stale ? `${skillName} is stale because /${stale.staleBecauseOf} was re-run.` : null,
+        stalenessReason: stale ? `${skillName} is stale because ${stale.staleBecauseOf} was re-run.` : null,
         isRequired: required.has(skillName),
         isOptional: !required.has(skillName)
       });
@@ -141,9 +141,9 @@ function workflowStage(entries: ReviewEntry[]): WorkflowStage {
 }
 
 function topBlockers(openGates: string[], staleArtifacts: ArtifactStalenessReport[], entries: ReviewEntry[]): string[] {
-  const failed = entries.filter((entry) => entry.verdict === "FAIL").map((entry) => `/${entry.skillName} failed`);
-  const stale = staleArtifacts.map((entry) => `/${entry.skillName} stale after /${entry.staleBecauseOf}`);
-  const open = openGates.map((gate) => `/${gate} gate is open`);
+  const failed = entries.filter((entry) => entry.verdict === "FAIL").map((entry) => `${entry.skillName} failed`);
+  const stale = staleArtifacts.map((entry) => `${entry.skillName} stale after ${entry.staleBecauseOf}`);
+  const open = openGates.map((gate) => `${gate} gate is open`);
   return [...failed, ...stale, ...open].slice(0, 3);
 }
 

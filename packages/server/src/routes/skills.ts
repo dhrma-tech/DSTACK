@@ -17,7 +17,7 @@ skillsRouter.get('/', async (req, res) => {
 
       return {
         name: skill.name,
-        command: `/${skill.name}`,
+        command: skill.name,
         description: skill.description || 'No description provided.',
         stage,
         maturity: 'complete',
@@ -25,7 +25,7 @@ skillsRouter.get('/', async (req, res) => {
         hasLatestArtifact: false,
         requiresArtifacts: skill.requiresArtifacts || [],
         hidden: false,
-        model: skill.defaultModel || 'gemini-2.5-pro',
+        model: skill.model || 'gemini-2.5-pro',
         allowedTools: skill.allowedTools || []
       };
     });

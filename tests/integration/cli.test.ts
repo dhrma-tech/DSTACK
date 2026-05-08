@@ -15,8 +15,10 @@ describe("CLI", () => {
     const workspace = await tempWorkspace();
     try {
       const result = await route(await parseArgv(["--list-skills"], workspace.root));
-      expect(result.stdout).toContain("/office-hours");
-      expect(result.stdout).toContain("/ship");
+      expect(result.stdout).toContain("office-hours");
+      expect(result.stdout).toContain("ship");
+      expect(result.stdout).not.toContain("/office-hours");
+      expect(result.stdout).not.toContain("/ship");
     } finally {
       await workspace.cleanup();
     }
@@ -38,6 +40,7 @@ describe("CLI", () => {
 
   it("parses explicit fake provider selection", async () => {
     const parsed = await parseArgv(["/office-hours", "--provider", "fake"]);
+    expect(parsed.invocation?.skillName).toBe("office-hours");
     expect(parsed.invocation?.flags.provider).toBe("fake");
   });
 

@@ -5,6 +5,8 @@ import { projectRouter } from './routes/project';
 import { skillsRouter } from './routes/skills';
 import { artifactsRouter } from './routes/artifacts';
 import { attachRunRoutes } from './routes/runs';
+import { attachSandboxRoutes } from './routes/sandbox';
+import { attachWorkflowRoutes } from './routes/workflows';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -23,6 +25,8 @@ app.use('/api/skills', skillsRouter);
 app.use('/api/artifacts', artifactsRouter);
 
 attachRunRoutes(app);
+attachWorkflowRoutes(app);
+attachSandboxRoutes(app);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

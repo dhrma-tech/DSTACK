@@ -31,7 +31,7 @@ export function helpText(): string {
   ].join("\n");
 }
 export const versionText = (version: string): string => `ds ${version}`;
-export const skillsText = (skills: SkillManifest[]): string => skills.map((skill) => `${chalk.cyan(`/${skill.name}`)} ${skill.description}`).join("\n");
+export const skillsText = (skills: SkillManifest[]): string => skills.map((skill) => `${chalk.cyan(skill.name)} ${skill.description}`).join("\n");
 export function skillCheckText(report: SkillAuditReport): string {
   return [
     "DStack Skill Check",
@@ -40,10 +40,10 @@ export function skillCheckText(report: SkillAuditReport): string {
     `Manifest validation: ${report.totalSkills}/42 loaded`,
     `Errors: ${report.errors.length}`,
     `Warnings: ${report.warnings.length}`,
-    `Phase 2 central shim skills: ${report.centralShimSkills.length > 0 ? report.centralShimSkills.map((skill) => `/${skill}`).join(", ") : "none"}`,
+    `Phase 2 central shim skills: ${report.centralShimSkills.length > 0 ? report.centralShimSkills.join(", ") : "none"}`,
     "",
-    ...(report.errors.length > 0 ? ["Errors:", ...report.errors.map((issue) => `- /${issue.skillName} [${issue.check}] ${issue.message}`), ""] : []),
-    ...(report.warnings.length > 0 ? ["Warnings:", ...report.warnings.map((issue) => `- /${issue.skillName} [${issue.check}] ${issue.message}`)] : [])
+    ...(report.errors.length > 0 ? ["Errors:", ...report.errors.map((issue) => `- ${issue.skillName} [${issue.check}] ${issue.message}`), ""] : []),
+    ...(report.warnings.length > 0 ? ["Warnings:", ...report.warnings.map((issue) => `- ${issue.skillName} [${issue.check}] ${issue.message}`)] : [])
   ].join("\n");
 }
 // JSON Envelope Functions
@@ -143,7 +143,7 @@ export function resultJson(result: SkillRunResult, options: {
     projectId?: string;
     warnings: Array<{ code: string; message: string; severity: "warning" }>;
   } = {
-    command: `/${result.skillName}`,
+    command: result.skillName,
     warnings: result.warnings?.map(w => ({
       code: "RUN_WARNING",
       message: w,
@@ -161,14 +161,14 @@ export function resultJson(result: SkillRunResult, options: {
 export function resultText(result: SkillRunResult, options: { provider: ProviderName; includeOutput: boolean; runtimeStatus?: RuntimeStatus }): string {
   const status = options.runtimeStatus;
   const lines = [
-    `${chalk.green("Completed")} /${result.skillName}`,
+    `${chalk.green("Completed")} ${result.skillName}`,
     `Status: ${result.status}`,
     `Provider: ${options.provider}`,
     ...(status && status.safetyMode !== "NORMAL" ? [`Safety mode: ${status.safetyMode}`] : []),
     ...(status?.deployFrozen ? [`Deploy status: DEPLOY FROZEN${status.deployFreezeReason ? ` (${status.deployFreezeReason})` : ""}`] : []),
     ...(result.verdict ? [`Verdict: ${result.verdict}`] : []),
     `Artifact: ${result.artifactPath ?? "not written"}`,
-    `Next: ${result.nextSkill ? `ds /${result.nextSkill}` : "none"}`
+    `Next skill: ${result.nextSkill ?? "none"}`
   ];
   if (options.includeOutput && result.output) {
     lines.push("", "Artifact JSON:", JSON.stringify(result.output, null, 2));

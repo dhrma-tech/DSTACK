@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { DeployStore } from "../../packages/core/src/deploy/store.js";
+import { StateDesyncError } from "../../packages/core/src/services/sandbox.js";
 
 describe("DeployStore", () => {
   let tempDir: string;
@@ -37,6 +38,25 @@ describe("DeployStore", () => {
     it("returns empty runs when deploy directory doesn't exist", async () => {
       const runs = await store.listRuns();
       expect(runs).toEqual([]);
+    });
+  });
+
+  describe("sandbox materialization checks", () => {
+    it("writes agent files through the sandbox and verifies they exist", async () => {
+      const verifications = await store.writeAgentFiles({
+        "components/Button.tsx": "export function Button() { return null; }\n"
+      });
+
+      expect(verifications).toHaveLength(1);
+      expect(verifications[0]?.exists).toBe(true);
+      expect(verifications[0]?.sizeBytes).toBeGreaterThan(0);
+      await expect(fs.readFile(path.join(tempDir, "components", "Button.tsx"), "utf8")).resolves.toContain("Button");
+    });
+
+    it("throws StateDesyncError when an agent claims an empty file was written", async () => {
+      await expect(store.writeAgentFiles({
+        "components/Empty.tsx": ""
+      })).rejects.toBeInstanceOf(StateDesyncError);
     });
   });
 

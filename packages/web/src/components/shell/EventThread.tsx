@@ -1,93 +1,78 @@
 'use client';
 
 import React from 'react';
+import type { AgentEvent } from '@dstack/shared';
 import ReasoningBlock from './events/ReasoningBlock';
 import ToolCallCard from './events/ToolCallCard';
 import ApprovalGateCard from './events/ApprovalGateCard';
 import ArtifactSaveCard from './events/ArtifactSaveCard';
+import AgentAvatar from './AgentAvatar';
+import CodeWindow from '../CodeWindow';
 
 interface EventThreadProps {
-  events: any[];
+  events: AgentEvent[];
   onApproval: (decision: 'approve' | 'deny') => void;
 }
 
 export default function EventThread({ events, onApproval }: EventThreadProps) {
-  // Group tool-calls with their results
-  const renderedEvents = [];
-  const toolResults = new Map<string, any>();
-  
-  // Find results first
-  for (const event of events) {
-    if (event.type === 'tool-result') {
-      toolResults.set(event.toolName, event);
-    }
-  }
-
-  const finalEvents = [];
-  let currentReasoning = [];
-
-  for (const event of events) {
-    if (event.type === 'reasoning') {
-      currentReasoning.push(event.text);
-    } else {
-      if (currentReasoning.length > 0) {
-        finalEvents.push({ type: 'reasoning-group', texts: [...currentReasoning] });
-        currentReasoning = [];
-      }
-      finalEvents.push(event);
-    }
-  }
-  if (currentReasoning.length > 0) {
-    finalEvents.push({ type: 'reasoning-group', texts: currentReasoning });
-  }
-
-  let i = 0;
-  for (const event of finalEvents) {
-    if (event.type === 'reasoning-group') {
-      renderedEvents.push(<ReasoningBlock key={`e-${i}`} text={event.texts.join('\n')} />);
-    } else if (event.type === 'tool-call') {
-      renderedEvents.push(
-        <ToolCallCard
-          key={`e-${i}`}
-          toolName={event.toolName}
-          args={event.args}
-          status={toolResults.has(event.toolName) ? (toolResults.get(event.toolName).success ? 'success' : 'error') : 'pending'}
-          result={toolResults.get(event.toolName)}
-        />
-      );
-    } else if (event.type === 'approval-required') {
-      // Find if we have a reasoning event after this in the ORIGINAL events that says "Approval decision sent"
-      // Or just look for any event that would indicate we've moved past it.
-      // For now, keep it simple.
-      renderedEvents.push(
-        <ApprovalGateCard
-          key={`e-${i}`}
-          description={event.description}
-          onRespond={onApproval}
-        />
-      );
-    } else if (event.type === 'artifact-saved') {
-      renderedEvents.push(
-        <ArtifactSaveCard
-          key={`e-${i}`}
-          skillName={event.skillName}
-          verdict={event.verdict}
-          path={event.path}
-        />
-      );
-    } else if (event.type === 'error') {
-       renderedEvents.push(
-        <div key={`e-${i}`} className="card" style={{ border: '1px solid var(--color-error)', backgroundColor: 'rgba(239,68,68,0.02)', padding: 12, marginBottom: 16, color: 'var(--color-error)', fontSize: 13 }}>
-          <strong>Error:</strong> {event.message || JSON.stringify(event)}
-        </div>
-      );
-    }
-    i++;
-  }
-
   return (
-    <div style={{ width: '100%', maxWidth: 720 }}>
-      {renderedEvents}
+    <div style={{ width: '100%', maxWidth: 760 }}>
+      {events.map((event) => {
+        switch (event.type) {
+          case 'agent_started':
+            return (
+              <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14, display: 'flex', gap: 12, alignItems: 'center' }}>
+                <AgentAvatar agent={event.agent} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{event.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{event.message}</div>
+                </div>
+              </div>
+            );
+          case 'reasoning_trace':
+            return <ReasoningBlock key={event.id} steps={event.steps} activeStep={event.activeStep} agent={event.agent} />;
+          case 'tool_call':
+            return <ToolCallCard key={event.id} toolName={event.toolName} args={event.args} status="pending" />;
+          case 'tool_result':
+            return <ToolCallCard key={event.id} toolName={event.toolCallId} args={{}} status={event.success ? 'success' : 'error'} result={{ success: event.success, stdout: event.stdout, stderr: event.stderr, code: event.code }} />;
+          case 'approval_required':
+            return <ApprovalGateCard key={event.id} gate={event.gate} onRespond={onApproval} />;
+          case 'artifact_saved':
+            return <ArtifactSaveCard key={event.id} skillName={event.skillName} verdict={event.verdict ?? 'PASS'} path={event.artifactPath} />;
+          case 'file_patch':
+            return <div key={event.id} style={{ marginBottom: 16 }}><CodeWindow title={event.patch.filePath} code={event.patch.after ?? ''} diffRows={event.patch.diff} /></div>;
+          case 'preview_ready':
+            return (
+              <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14 }}>
+                <strong>Preview ready:</strong> <a href={event.previewUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>{event.previewUrl}</a>
+              </div>
+            );
+          case 'visual_qa_result':
+            return (
+              <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14 }}>
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>Visual QA</div>
+                {event.findings.map((finding) => (
+                  <div key={finding.id} style={{ fontSize: 13, marginBottom: 8 }}>
+                    <strong>{finding.severity}</strong> {finding.description}
+                    <div style={{ color: 'var(--color-text-tertiary)' }}>{finding.recommendedFix}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          case 'workflow_stalled':
+            return (
+              <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14, borderColor: 'var(--color-error)' }}>
+                <strong>Conflict Resolution Required</strong>
+                <p style={{ fontSize: 13 }}>{event.stalled.reason}</p>
+                <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{event.stalled.recommendedHumanAction}</p>
+              </div>
+            );
+          case 'run_complete':
+            return <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14, borderColor: 'var(--color-success)' }}><strong>Run complete:</strong> {event.summary}</div>;
+          case 'run_error':
+            return <div key={event.id} className="card" style={{ padding: 14, marginBottom: 14, borderColor: 'var(--color-error)', color: 'var(--color-error)' }}><strong>Error:</strong> {event.message}</div>;
+        }
+      })}
     </div>
   );
 }

@@ -32,7 +32,7 @@ export const attachRunRoutes = (app: import('express').Express) => {
             const parsed = JSON.parse(content);
             return {
               id: file.replace('.json', ''),
-              command: `/${parsed.skillName}`,
+              command: parsed.skillName,
               provider: parsed.provider || 'gemini',
               fakeMode: parsed.provider === 'fake',
               status: parsed.status,
@@ -46,7 +46,8 @@ export const attachRunRoutes = (app: import('express').Express) => {
         })
       );
       
-      res.json(runs.filter(Boolean).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
+      const presentRuns = runs.filter((run): run is NonNullable<typeof run> => run !== null);
+      res.json(presentRuns.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
     } catch (err) {
       console.error('Failed to list runs:', err);
       res.status(500).json({ error: 'Failed to list runs' });
@@ -77,7 +78,8 @@ export const attachRunRoutes = (app: import('express').Express) => {
 
     const emitter = globalSkillRunner.getEmitter(runId);
     if (!emitter) {
-      if (log.length > 0 && log[log.length - 1].type === 'complete') {
+      const lastEvent = log.at(-1);
+      if (lastEvent?.type === 'complete') {
         // Run is already finished and emitter cleaned up
         res.end();
       } else {
@@ -87,7 +89,7 @@ export const attachRunRoutes = (app: import('express').Express) => {
       return;
     }
 
-    const listener = (event: any) => {
+    const listener = (event: import('../stream/skill-runner').RunEvent) => {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
       if (event.type === 'complete') {
         res.end();

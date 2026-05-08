@@ -7,7 +7,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { WorkflowGraph } from "../../packages/core/src/workflow/graph.js";
+import { computeAssetHash, WorkflowGateError, WorkflowGraph } from "../../packages/core/src/workflow/graph.js";
 
 describe("WorkflowGraph", () => {
   let tempDir: string;
@@ -409,6 +409,39 @@ describe("WorkflowGraph", () => {
       // Should only include the valid skill
       expect(graph.nodes).toHaveLength(1);
       expect(graph.nodes[0].skillName).toBe("valid");
+    });
+  });
+
+  describe("strict DAG state gates", () => {
+    it("rejects stage transitions without a verified asset hash or approval token", async () => {
+      await expect(workflowGraph.transition({
+        from: "IDLE",
+        to: "PLANNING",
+        actor: "CEO",
+        createdAt: new Date().toISOString(),
+        rationale: "Start planning without a gate payload"
+      })).rejects.toBeInstanceOf(WorkflowGateError);
+    });
+
+    it("persists a valid sequential transition with a matching asset hash", async () => {
+      const assets = {
+        "prd.md": "# Product brief\nBuild the reliability workflow."
+      };
+      const nextState = await workflowGraph.transition({
+        from: "IDLE",
+        to: "PLANNING",
+        actor: "CEO",
+        createdAt: new Date().toISOString(),
+        rationale: "Planning assets are materialized and verified.",
+        assets,
+        assetHash: computeAssetHash(assets)
+      });
+
+      expect(nextState.currentStage).toBe("PLANNING");
+      expect(nextState.transitions).toHaveLength(1);
+
+      const reloaded = await workflowGraph.readState();
+      expect(reloaded.currentStage).toBe("PLANNING");
     });
   });
 });

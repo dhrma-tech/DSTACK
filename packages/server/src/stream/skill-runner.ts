@@ -4,7 +4,8 @@ import path from 'path';
 
 export interface RunEvent {
   type: 'reasoning' | 'tool-call' | 'tool-result' | 'approval-required' | 'artifact-saved' | 'complete' | 'error';
-  payload?: any;
+  payload?: unknown;
+  [key: string]: unknown;
 }
 
 export class SkillRunner {
@@ -20,11 +21,11 @@ export class SkillRunner {
     // Push initial command event
     this.emitEvent(runId, {
       type: 'reasoning',
-      text: `Starting skill: /${skillName}`
+      text: `Starting skill: ${skillName}`
     });
 
     // Format CLI args
-    const cliArgs = [`/${skillName}`, '--json-events'];
+    const cliArgs = [skillName, '--json-events'];
     for (const [key, value] of Object.entries(args)) {
       if (value !== undefined && value !== null) cliArgs.push(`--${key}=${value}`);
     }
@@ -49,12 +50,12 @@ export class SkillRunner {
         try {
           const event = JSON.parse(line);
           this.emitEvent(runId, event);
-        } catch (e) {
-          // Fallback if not JSON
-          this.emitEvent(runId, {
-            type: 'reasoning',
-            text: line
-          } as any);
+          } catch {
+            // Fallback if not JSON
+            this.emitEvent(runId, {
+              type: 'reasoning',
+              text: line
+          });
         }
       }
     });
@@ -64,7 +65,7 @@ export class SkillRunner {
       this.emitEvent(runId, {
         type: 'error',
         message: text
-      } as any);
+      });
     });
 
     child.on('close', (code) => {
@@ -72,7 +73,7 @@ export class SkillRunner {
         type: 'complete',
         status: code === 0 ? 'complete' : 'error',
         skillName
-      } as any);
+      });
       // We keep the log around for late joiners, but we might want to clean up emitters
       setTimeout(() => {
         this.activeRuns.delete(runId);

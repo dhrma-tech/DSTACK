@@ -71,12 +71,12 @@ export default function Home() {
 
 [DSTACK] Initializing agentic loop...
 [DSTACK] Provider: gemini-2.0-flash
-[DSTACK] Skill: /office-hours loaded (3 tools)
+[DSTACK] Skill: office-hours loaded (3 tools)
 [DSTACK] Analyzing market landscape...
 [DSTACK] 4 competitor patterns identified
 [DSTACK] Generating roadmap.json artifact...
 ✓ Artifact saved: .dstack/artifacts/roadmap.json
-✓ Next recommended: /autoplan`}
+✓ Next recommended: autoplan`}
           />
         </div>
       </section>
@@ -122,14 +122,14 @@ export default function Home() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
-            { cmd: '/office-hours', stage: 'Planning' },
-            { cmd: '/autoplan', stage: 'Planning' },
-            { cmd: '/design-consultation', stage: 'Design' },
-            { cmd: '/review', stage: 'QA' },
-            { cmd: '/qa', stage: 'QA' },
-            { cmd: '/ship', stage: 'Ship' },
-            { cmd: '/benchmark', stage: 'QA' },
-            { cmd: '/deploy', stage: 'Ship' },
+            { cmd: 'office-hours', stage: 'Planning' },
+            { cmd: 'autoplan', stage: 'Planning' },
+            { cmd: 'design-consultation', stage: 'Design' },
+            { cmd: 'review', stage: 'QA' },
+            { cmd: 'qa', stage: 'QA' },
+            { cmd: 'ship', stage: 'Ship' },
+            { cmd: 'benchmark', stage: 'QA' },
+            { cmd: 'deploy', stage: 'Ship' },
           ].map((s: any) => (
             <div key={s.cmd} className="card card-interactive" style={{ padding: '14px 16px', textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{s.cmd}</div>
@@ -152,12 +152,12 @@ export default function Home() {
         <div className="card" style={{ padding: 32, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[
-              { name: '/office-hours', done: true },
-              { name: '/autoplan', done: true },
-              { name: '/design', done: false, active: true },
-              { name: '/review', done: false },
-              { name: '/qa', done: false },
-              { name: '/ship', done: false },
+              { name: 'office-hours', done: true },
+              { name: 'autoplan', done: true },
+              { name: 'design', done: false, active: true },
+              { name: 'review', done: false },
+              { name: 'qa', done: false },
+              { name: 'ship', done: false },
             ].map((step: any, i: number, arr: any[]) => (
               <React.Fragment key={step.name}>
                 <div style={{

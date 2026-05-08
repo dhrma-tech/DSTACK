@@ -25,7 +25,7 @@ export default function BrowserPage() {
           <EmptyState
             icon={<Globe size={48} strokeWidth={1} />}
             title="No browser sessions"
-            description="Run /qa or /browse to capture browser snapshots and generate QA reports."
+            description="Run qa or browse to capture browser snapshots and generate QA reports."
           />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>

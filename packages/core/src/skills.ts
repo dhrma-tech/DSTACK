@@ -84,14 +84,14 @@ export class SkillExecutor {
     validateInputs(manifest, invocation.inputs);
     const session = await this.logger.createSession(manifest.name, invocation.flags.jsonEvents);
     try {
-      await session.event("info", "reasoning", { text: `Resolving prerequisites for /${manifest.name}...` });
+      await session.event("info", "reasoning", { text: `Resolving prerequisites for ${manifest.name}...` });
       const prerequisiteArtifacts: Record<string, JsonObject> = {};
       for (const required of manifest.requiresArtifacts) {
         const artifact = await this.artifacts.readLatest(required);
-        if (!artifact && !invocation.flags.force) throw new ArtifactError(`/${manifest.name} requires /${required}. Run /${required} first or pass --force.`);
+        if (!artifact && !invocation.flags.force) throw new ArtifactError(`${manifest.name} requires ${required}. Run ${required} first or pass --force.`);
         if (artifact) prerequisiteArtifacts[required] = artifact.content;
       }
-      await session.event("info", "reasoning", { text: `Enforcing workflow gates for /${manifest.name}...` });
+      await session.event("info", "reasoning", { text: `Enforcing workflow gates for ${manifest.name}...` });
       await enforceWorkflowGates(manifest, prerequisiteArtifacts, invocation.flags.force, this.options.config.dstackDir);
       const toolExecutor = new ToolExecutor(this.tools, { projectRoot: invocation.projectRoot, config: this.options.config, logger: session, interactive: this.options.interactive ?? true });
       const context: SkillExecutionContext = { manifest, invocation, config: this.options.config, artifactStore: this.artifacts, memoryStore: this.memory, checkpointStore: this.checkpoints, toolExecutor, prerequisiteArtifacts, generatedBy: this.generatedBy };
@@ -125,9 +125,9 @@ export class SkillExecutor {
         }
         for (const toolCall of response.toolCalls) toolResults.push((await toolExecutor.dispatch(toolCall)).output);
       }
-      if (!rawOutput) throw new SkillError(`/${manifest.name} did not produce final output`);
+      if (!rawOutput) throw new SkillError(`${manifest.name} did not produce final output`);
       const output = markGenerated(context, await handler.postProcess(rawOutput, context));
-      if (Object.keys(output).length === 0) throw new ValidationError(`/${manifest.name} produced empty output`);
+      if (Object.keys(output).length === 0) throw new ValidationError(`${manifest.name} produced empty output`);
       validateOutputSchema(manifest, output);
       if (manifest.name === "office-hours") await this.memory.seedFromOfficeHours(output);
       const artifact = invocation.flags.dryRun ? null : await this.artifacts.write(manifest.name, output);
@@ -151,7 +151,7 @@ export class SkillExecutor {
     const sourcePath = path.join(dir, "handler.ts");
     const builtPath = path.join(dir, "handler.js");
     const loaded = await import(pathToFileURL(sourcePath).href).catch(async () => import(pathToFileURL(builtPath).href)) as { default?: unknown };
-    if (!isHandler(loaded.default)) throw new SkillError(`Invalid handler for /${manifest.name}`);
+    if (!isHandler(loaded.default)) throw new SkillError(`Invalid handler for ${manifest.name}`);
     return loaded.default;
   }
 }
@@ -195,7 +195,7 @@ export const contextRestoreHandler: SkillHandler = {
 
 function validateInputs(manifest: SkillManifest, inputs: Record<string, unknown>): void {
   const missing = manifest.inputs.filter((input) => input.required && inputs[input.name] === undefined).map((input) => input.name);
-  if (missing.length > 0) throw new ValidationError(`Missing required inputs for /${manifest.name}: ${missing.join(", ")}`);
+  if (missing.length > 0) throw new ValidationError(`Missing required inputs for ${manifest.name}: ${missing.join(", ")}`);
 }
 
 async function relevantLearnings(dstackDir: string, skillName: string): Promise<JsonObject[]> {
@@ -205,7 +205,7 @@ async function relevantLearnings(dstackDir: string, skillName: string): Promise<
 export function validateOutputSchema(manifest: SkillManifest, output: JsonObject): void {
   const issues = validateJsonSchema(manifest.outputSchema, output, "$");
   if (issues.length > 0) {
-    throw new ValidationError(`/${manifest.name} output failed schema validation`, { issues });
+    throw new ValidationError(`${manifest.name} output failed schema validation`, { issues });
   }
 }
 export function validateJsonSchema(schema: JsonObject, value: JsonValue, pathName: string): string[] {
@@ -241,26 +241,26 @@ export function validateJsonSchema(schema: JsonObject, value: JsonValue, pathNam
 async function enforceWorkflowGates(manifest: SkillManifest, artifacts: Record<string, JsonObject>, force: boolean, dstackDir: string): Promise<void> {
   if (force) return;
   if (manifest.name === "plan-eng-review" && artifacts["plan-ceo-review"]?.overallVerdict === "FAIL") {
-    throw new ArtifactError("/plan-eng-review is blocked because /plan-ceo-review failed. Re-run /autoplan or pass --force.");
+    throw new ArtifactError("plan-eng-review is blocked because plan-ceo-review failed. Re-run autoplan or pass --force.");
   }
   if (manifest.name === "design-consultation" && artifacts["plan-design-review"]?.overallVerdict === "FAIL") {
-    throw new ArtifactError("/design-consultation is blocked because /plan-design-review failed. Re-run /autoplan or pass --force.");
+    throw new ArtifactError("design-consultation is blocked because plan-design-review failed. Re-run autoplan or pass --force.");
   }
   if (manifest.name === "design-consultation" && artifacts["plan-eng-review"]?.overallVerdict === "FAIL") {
-    throw new ArtifactError("/design-consultation is blocked because /plan-eng-review failed. Re-run /autoplan or pass --force.");
+    throw new ArtifactError("design-consultation is blocked because plan-eng-review failed. Re-run autoplan or pass --force.");
   }
   if (manifest.name === "ship") {
     if (artifacts.qa?.overallVerdict !== "PASS") {
-      throw new ArtifactError("/ship is blocked until /qa has an overallVerdict of PASS.");
+      throw new ArtifactError("ship is blocked until qa has an overallVerdict of PASS.");
     }
     const review = artifacts.review;
     const criticalIssues = Array.isArray(review?.criticalIssues) ? review.criticalIssues : [];
     if (review?.overallVerdict === "FAIL" || criticalIssues.length > 0) {
-      throw new ArtifactError("/ship is blocked by unresolved critical review findings.");
+      throw new ArtifactError("ship is blocked by unresolved critical review findings.");
     }
     const staleHardGates = (await new StalenessDetector({ dstackDir }).detect()).filter((entry) => entry.skillName === "qa" || entry.skillName === "review");
     if (staleHardGates.length > 0) {
-      throw new ArtifactError(`/ship is blocked by stale hard gate artifacts: ${staleHardGates.map((entry) => `/${entry.skillName}`).join(", ")}.`);
+      throw new ArtifactError(`ship is blocked by stale hard gate artifacts: ${staleHardGates.map((entry) => entry.skillName).join(", ")}.`);
     }
   }
 }

@@ -112,6 +112,6 @@ const handler: SkillHandler = {
 };
 
 export default handler;
-// Review before installing /${skillName}. Generated skills can call tools.
+// Review before installing ${skillName}. Generated skills can call tools.
 `;
 }

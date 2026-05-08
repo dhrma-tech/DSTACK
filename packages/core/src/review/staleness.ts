@@ -77,7 +77,7 @@ export class StalenessDetector {
           staleBecauseOf: staleDependency.dependency,
           staleSince: staleDependency.artifact.createdAt,
           severity: severityFor(skillName),
-          recommendation: `Re-run /${skillName}`
+          recommendation: `Re-run ${skillName}`
         });
         continue;
       }
@@ -92,7 +92,7 @@ export class StalenessDetector {
           staleBecauseOf: propagated.staleBecauseOf,
           staleSince: propagated.staleSince,
           severity: severityFor(skillName),
-          recommendation: `Re-run /${skillName}`
+          recommendation: `Re-run ${skillName}`
         });
         break;
       }

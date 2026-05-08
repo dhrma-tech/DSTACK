@@ -73,7 +73,7 @@ export async function route(command: ParsedCommand): Promise<{ stdout: string; s
           requestId: 'skill-error-' + Date.now(),
           timestamp: new Date().toISOString(),
           apiVersion: 'v1',
-          command: `/${command.invocation?.skillName || 'unknown'}`,
+          command: command.invocation?.skillName || 'unknown',
           projectId: shortHash(config.projectRoot, 12)
         }
       };

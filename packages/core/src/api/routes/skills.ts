@@ -53,7 +53,7 @@ export class SkillsRoutes {
       // Convert to Skill DTO format
       const skillDtos: Contracts.Skill[] = filteredSkills.map(skill => ({
         name: skill.name,
-        command: `/${skill.name}`,
+        command: skill.name,
         description: skill.description,
         stage: "unknown", // TODO: Determine from skill metadata
         maturity: skill.maturity ?? "complete",

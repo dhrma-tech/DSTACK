@@ -20,12 +20,14 @@ export interface Project {
 }
 
 export interface Skill {
+  id?: string;
   name: string;
   command: string;
   description: string;
   stage: string;
   maturity: "complete" | "partial" | "experimental";
   available: boolean;
+  status?: "ready" | "blocked";
   hidden: boolean;
   model: string;
   requiresArtifacts: string[];
@@ -150,23 +152,23 @@ export const MOCK_PROJECT: Project = {
 };
 
 export const MOCK_SKILLS: Skill[] = [
-  { name: "office-hours", command: "/office-hours", description: "Brainstorm and refine product ideas with AI-powered market analysis.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["web_search", "read_file"], hasLatestArtifact: true, lastRunAt: "2026-05-02T08:00:00Z", nextSkill: "autoplan" },
-  { name: "autoplan", command: "/autoplan", description: "Automatically generate project plans and dev tickets from roadmaps.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["office-hours"], allowedTools: ["read_file", "write_file"], hasLatestArtifact: true, lastRunAt: "2026-05-02T08:30:00Z", nextSkill: "design-consultation" },
-  { name: "plan-ceo-review", command: "/plan-ceo-review", description: "Executive-level review of the product plan and strategy.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.5-pro", requiresArtifacts: ["autoplan"], allowedTools: ["read_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "plan-eng-review" },
-  { name: "design-consultation", command: "/design-consultation", description: "Get design feedback, UX recommendations, and variant exploration.", stage: "design", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["autoplan"], allowedTools: ["read_file", "write_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "design-review" },
-  { name: "design-review", command: "/design-review", description: "Review and score design variants against taste profile.", stage: "design", maturity: "partial", available: false, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["design-consultation"], allowedTools: ["read_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "review" },
-  { name: "review", command: "/review", description: "Full project readiness review with artifact staleness detection.", stage: "qa", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["read_file", "list_directory"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "qa" },
-  { name: "qa", command: "/qa", description: "Run automated tests, security audits, and browser-based QA checks.", stage: "qa", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["review"], allowedTools: ["run_shell", "browser_navigate", "browser_screenshot"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "ship" },
-  { name: "ship", command: "/ship", description: "Finalize artifacts and prepare for production deployment.", stage: "shipped", maturity: "complete", available: false, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["qa"], allowedTools: ["read_file", "write_file", "run_shell"], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
-  { name: "benchmark", command: "/benchmark", description: "Benchmark model performance across prompt suites.", stage: "qa", maturity: "partial", available: true, hidden: true, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: [], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
-  { name: "context-save", command: "/context-save", description: "Save current project context as a checkpoint.", stage: "planning", maturity: "complete", available: true, hidden: true, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["read_file", "write_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
+  { name: "office-hours", command: "office-hours", description: "Brainstorm and refine product ideas with AI-powered market analysis.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["web_search", "read_file"], hasLatestArtifact: true, lastRunAt: "2026-05-02T08:00:00Z", nextSkill: "autoplan" },
+  { name: "autoplan", command: "autoplan", description: "Automatically generate project plans and dev tickets from roadmaps.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["office-hours"], allowedTools: ["read_file", "write_file"], hasLatestArtifact: true, lastRunAt: "2026-05-02T08:30:00Z", nextSkill: "design-consultation" },
+  { name: "plan-ceo-review", command: "plan-ceo-review", description: "Executive-level review of the product plan and strategy.", stage: "planning", maturity: "complete", available: true, hidden: false, model: "gemini-2.5-pro", requiresArtifacts: ["autoplan"], allowedTools: ["read_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "plan-eng-review" },
+  { name: "design-consultation", command: "design-consultation", description: "Get design feedback, UX recommendations, and variant exploration.", stage: "design", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["autoplan"], allowedTools: ["read_file", "write_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "design-review" },
+  { name: "design-review", command: "design-review", description: "Review and score design variants against taste profile.", stage: "design", maturity: "partial", available: false, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["design-consultation"], allowedTools: ["read_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "review" },
+  { name: "review", command: "review", description: "Full project readiness review with artifact staleness detection.", stage: "qa", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["read_file", "list_directory"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "qa" },
+  { name: "qa", command: "qa", description: "Run automated tests, security audits, and browser-based QA checks.", stage: "qa", maturity: "complete", available: true, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["review"], allowedTools: ["run_shell", "browser_navigate", "browser_screenshot"], hasLatestArtifact: false, lastRunAt: null, nextSkill: "ship" },
+  { name: "ship", command: "ship", description: "Finalize artifacts and prepare for production deployment.", stage: "shipped", maturity: "complete", available: false, hidden: false, model: "gemini-2.0-flash", requiresArtifacts: ["qa"], allowedTools: ["read_file", "write_file", "run_shell"], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
+  { name: "benchmark", command: "benchmark", description: "Benchmark model performance across prompt suites.", stage: "qa", maturity: "partial", available: true, hidden: true, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: [], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
+  { name: "context-save", command: "context-save", description: "Save current project context as a checkpoint.", stage: "planning", maturity: "complete", available: true, hidden: true, model: "gemini-2.0-flash", requiresArtifacts: [], allowedTools: ["read_file", "write_file"], hasLatestArtifact: false, lastRunAt: null, nextSkill: null },
 ];
 
 export const MOCK_RUNS: SkillRun[] = [
-  { id: "run-9021", skillName: "office-hours", command: "/office-hours", status: "complete", requestedAt: "2026-05-02T08:00:00Z", completedAt: "2026-05-02T08:00:18Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: [], verdict: "PASS", duration: "18.2s" },
-  { id: "run-9020", skillName: "autoplan", command: "/autoplan", status: "complete", requestedAt: "2026-05-02T08:30:00Z", completedAt: "2026-05-02T08:31:15Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: [], verdict: "PASS", duration: "1m 15s" },
-  { id: "run-9019", skillName: "review", command: "/review", status: "error", requestedAt: "2026-05-02T09:00:00Z", completedAt: "2026-05-02T09:00:05Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: ["Missing required artifact: design-consultation"], verdict: "FAIL", duration: "5s" },
-  { id: "run-9018", skillName: "benchmark", command: "/benchmark", status: "complete", requestedAt: "2026-05-01T14:00:00Z", completedAt: "2026-05-01T14:02:30Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: true, warnings: ["Dry run — quality scores are approximate"], verdict: null, duration: "2m 30s" },
+  { id: "run-9021", skillName: "office-hours", command: "office-hours", status: "complete", requestedAt: "2026-05-02T08:00:00Z", completedAt: "2026-05-02T08:00:18Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: [], verdict: "PASS", duration: "18.2s" },
+  { id: "run-9020", skillName: "autoplan", command: "autoplan", status: "complete", requestedAt: "2026-05-02T08:30:00Z", completedAt: "2026-05-02T08:31:15Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: [], verdict: "PASS", duration: "1m 15s" },
+  { id: "run-9019", skillName: "review", command: "review", status: "error", requestedAt: "2026-05-02T09:00:00Z", completedAt: "2026-05-02T09:00:05Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: false, warnings: ["Missing required artifact: design-consultation"], verdict: "FAIL", duration: "5s" },
+  { id: "run-9018", skillName: "benchmark", command: "benchmark", status: "complete", requestedAt: "2026-05-01T14:00:00Z", completedAt: "2026-05-01T14:02:30Z", provider: "fake", model: "gemini-2.0-flash", fakeMode: true, dryRun: true, warnings: ["Dry run — quality scores are approximate"], verdict: null, duration: "2m 30s" },
 ];
 
 export const MOCK_ARTIFACTS: Artifact[] = [
@@ -243,13 +245,13 @@ export const MOCK_WORKFLOW: WorkflowGraph = {
   projectId: "proj-dstack-demo",
   currentStage: "planning",
   nodes: [
-    { id: "n1", nodeType: "skill", label: "/office-hours", stage: "planning", status: "complete", isRequired: true, isStale: false, skillName: "office-hours" },
-    { id: "n2", nodeType: "skill", label: "/autoplan", stage: "planning", status: "complete", isRequired: true, isStale: false, skillName: "autoplan" },
-    { id: "n3", nodeType: "skill", label: "/design-consultation", stage: "design", status: "ready", isRequired: true, isStale: false, skillName: "design-consultation" },
-    { id: "n4", nodeType: "skill", label: "/design-review", stage: "design", status: "not_run", isRequired: false, isStale: false, skillName: "design-review" },
-    { id: "n5", nodeType: "skill", label: "/review", stage: "qa", status: "not_run", isRequired: true, isStale: false, skillName: "review" },
-    { id: "n6", nodeType: "skill", label: "/qa", stage: "qa", status: "blocked", isRequired: true, isStale: false, skillName: "qa" },
-    { id: "n7", nodeType: "skill", label: "/ship", stage: "shipped", status: "blocked", isRequired: true, isStale: false, skillName: "ship" },
+    { id: "n1", nodeType: "skill", label: "office-hours", stage: "planning", status: "complete", isRequired: true, isStale: false, skillName: "office-hours" },
+    { id: "n2", nodeType: "skill", label: "autoplan", stage: "planning", status: "complete", isRequired: true, isStale: false, skillName: "autoplan" },
+    { id: "n3", nodeType: "skill", label: "design-consultation", stage: "design", status: "ready", isRequired: true, isStale: false, skillName: "design-consultation" },
+    { id: "n4", nodeType: "skill", label: "design-review", stage: "design", status: "not_run", isRequired: false, isStale: false, skillName: "design-review" },
+    { id: "n5", nodeType: "skill", label: "review", stage: "qa", status: "not_run", isRequired: true, isStale: false, skillName: "review" },
+    { id: "n6", nodeType: "skill", label: "qa", stage: "qa", status: "blocked", isRequired: true, isStale: false, skillName: "qa" },
+    { id: "n7", nodeType: "skill", label: "ship", stage: "shipped", status: "blocked", isRequired: true, isStale: false, skillName: "ship" },
   ],
   edges: [
     { id: "e1", fromNodeId: "n1", toNodeId: "n2", edgeType: "prerequisite", required: true },

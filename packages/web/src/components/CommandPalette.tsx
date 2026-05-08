@@ -124,7 +124,7 @@ export default function CommandPalette({ isOpen, onClose, onSelectSkill }: Comma
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{skill.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-error)' }}>Blocked by: /autoplan</div>
+                <div style={{ fontSize: 11, color: 'var(--color-error)' }}>Blocked by: autoplan</div>
               </div>
             </div>
           ))}
