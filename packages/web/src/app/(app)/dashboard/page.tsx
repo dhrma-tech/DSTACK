@@ -5,13 +5,16 @@ import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import Badge from '@/components/ui/Badge';
 import type { BadgeVariant } from '@/components/ui/Badge';
+import SuggestionBanner from '@/components/SuggestionBanner';
 import { useApp } from '@/lib/app-context';
+import { useSuggestions } from '@/hooks/useSuggestions';
 import { api, type HealthReport, type RunRecord } from '@/lib/api';
 
 export default function DashboardPage() {
   const { project, runs } = useApp();
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [recentRuns, setRecentRuns] = useState<RunRecord[]>([]);
+  const { suggestions, loading: suggestionsLoading } = useSuggestions();
 
   useEffect(() => {
     api.getProjectHealth().then(setHealth).catch(() => null);
@@ -53,6 +56,20 @@ export default function DashboardPage() {
                 View full health report →
               </Link>
             </div>
+
+            {/* Suggested Next */}
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, overflow: 'hidden' }}>
+              <SuggestionBanner
+                suggestions={suggestions}
+                loading={suggestionsLoading}
+              />
+              {!suggestionsLoading && suggestions.length === 0 && (
+                <div style={{ padding: 20, textAlign: 'center' }}>
+                  <p style={{ fontSize: 13, color: 'var(--muted)' }}>All caught up! No pending suggestions.</p>
+                </div>
+              )}
+            </div>
+
 
             {/* Recent activity */}
             <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 16 }}>

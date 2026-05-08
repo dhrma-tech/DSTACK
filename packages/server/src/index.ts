@@ -7,6 +7,8 @@ import { artifactsRouter } from './routes/artifacts';
 import { attachRunRoutes } from './routes/runs';
 import { attachSandboxRoutes } from './routes/sandbox';
 import { attachWorkflowRoutes } from './routes/workflows';
+import { historyRouter } from './routes/history';
+import { suggestionsRouter } from './routes/suggestions';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -23,6 +25,8 @@ app.use(express.json());
 app.use('/api/project', projectRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/artifacts', artifactsRouter);
+app.use('/api/history', historyRouter);
+app.use('/api/workflow', suggestionsRouter);
 
 app.get('/api/workflow/graph', (req, res) => {
   res.json({

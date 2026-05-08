@@ -202,6 +202,28 @@ export interface DeployRun {
   healthCheckVerdict: 'PASS' | 'FAIL' | null;
 }
 
+export interface HistoryEntry {
+  id: string;
+  command: string;
+  skillName: string;
+  inputs: Record<string, string>;
+  flags: Record<string, boolean | string>;
+  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  provider: string;
+  model: string;
+}
+
+export interface WorkflowSuggestion {
+  skill: string;
+  priority: number;
+  reason: string;
+  risk: string;
+  category: 'critical' | 'recommended' | 'optional';
+}
+
 // ── SSE Event types ──────────────────────────────────────────────────────────
 
 export type ShellEvent =
@@ -250,6 +272,26 @@ export const api = {
 
   // Workflow
   getWorkflowGraph: () => apiFetch<WorkflowGraph>('/workflow/graph'),
+  getWorkflowSuggestions: () => apiFetch<{ suggestions: WorkflowSuggestion[]; computedAt: string }>('/workflow/suggestions'),
+  getWorkflowConflicts: () => apiFetch<{ conflicts: Array<{ artifactA: string; artifactB: string; field: string; conflict: string; severity: string }>; computedAt: string }>('/workflow/conflicts'),
+
+  // History
+  getHistory: (params?: { search?: string; skill?: string; verdict?: string; days?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set('search', params.search);
+    if (params?.skill) qs.set('skill', params.skill);
+    if (params?.verdict) qs.set('verdict', params.verdict);
+    if (params?.days) qs.set('days', String(params.days));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    return apiFetch<{ entries: HistoryEntry[]; total: number }>(`/history${query ? `?${query}` : ''}`);
+  },
+  addHistory: (entry: Partial<HistoryEntry>) =>
+    apiFetch<HistoryEntry>('/history', { method: 'POST', body: JSON.stringify(entry) }),
+  rerunFromHistory: (id: string) =>
+    apiFetch<{ skillName: string; inputs: Record<string, string>; flags: Record<string, boolean | string> }>(`/history/${id}/rerun`, { method: 'POST' }),
+  clearHistory: () =>
+    apiFetch<{ cleared: boolean }>('/history', { method: 'DELETE' }),
   startWorkflow: (prompt: string) =>
     apiFetch<{ runId: string }>('/workflows/runs', {
       method: 'POST',

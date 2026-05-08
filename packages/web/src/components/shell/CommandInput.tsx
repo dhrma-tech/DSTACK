@@ -2,14 +2,15 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Square } from 'lucide-react';
-import type { SkillSummary } from '@/lib/api';
+import { Square, Sparkles } from 'lucide-react';
+import type { SkillSummary, WorkflowSuggestion } from '@/lib/api';
 import SkillRunnerPanel from './SkillRunnerPanel';
 
 type InputMode = 'idle' | 'skill-selected' | 'running';
 
 interface CommandInputProps {
   skills: SkillSummary[];
+  suggestions?: WorkflowSuggestion[];
   isRunning: boolean;
   currentSkill: string | null;
   toolCallCount?: number;
@@ -20,6 +21,7 @@ interface CommandInputProps {
 
 export default function CommandInput({
   skills,
+  suggestions = [],
   isRunning,
   currentSkill,
   toolCallCount = 0,
@@ -166,6 +168,60 @@ export default function CommandInput({
           ))}
         </div>
       )}
+
+      {/* Context-aware suggestions when input is empty */}
+      {!text && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', bottom: '100%', left: 0, right: 0,
+          background: 'var(--surface-dark-elevated)', border: '1px solid #333',
+          borderRadius: 10, overflow: 'hidden', zIndex: 10,
+          padding: '8px 0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 14px 8px', borderBottom: '1px solid #333' }}>
+            <Sparkles size={11} style={{ color: 'var(--coral)' }} />
+            <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--coral)' }}>
+              Suggested
+            </span>
+          </div>
+          {suggestions.slice(0, 3).map((s) => (
+            <button
+              key={s.skill}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const skill = skills.find(sk => sk.name === s.skill);
+                if (skill) { setSelectedSkill(skill); setMode('skill-selected'); setText(''); }
+              }}
+              style={{
+                width: '100%', padding: '8px 14px',
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                border: 'none', cursor: 'pointer', textAlign: 'left',
+                background: 'transparent',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(204,120,92,0.08)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%',
+                background: s.category === 'critical' ? 'rgba(198,69,69,0.2)' : s.category === 'recommended' ? 'rgba(204,120,92,0.2)' : 'rgba(91,125,196,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 600, flexShrink: 0, marginTop: 1,
+                color: s.category === 'critical' ? 'var(--error)' : s.category === 'recommended' ? 'var(--coral)' : '#5b7dc4',
+              }}>
+                {s.priority}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--on-dark)' }}>
+                  /{s.skill}
+                </span>
+                <div style={{ fontSize: 11, color: 'var(--on-dark-soft)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                  {s.reason}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
 
       {/* Input bar */}
       <div style={{

@@ -8,12 +8,15 @@ import RightRail from '@/components/shell/RightRail';
 import UserCommandCard from '@/components/shell/events/UserCommandCard';
 import CommandPalette from '@/components/CommandPalette';
 import { useActiveRun } from '@/hooks/useActiveRun';
+import { useSuggestions } from '@/hooks/useSuggestions';
 import { useApp } from '@/lib/app-context';
 import type { ShellEvent } from '@/lib/api';
+import SuggestionBanner from '@/components/SuggestionBanner';
 
 export default function DstackPage() {
   const { skills, project } = useApp();
-  const { events, isRunning, currentSkill, startRun, stopRun, respondToApproval } = useActiveRun();
+  const { events, isRunning, currentSkill, startRun, stopRun, respondToApproval, verdict } = useActiveRun();
+  const { suggestions, loading: suggestionsLoading } = useSuggestions(events.length);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null);
   const [userCommands, setUserCommands] = useState<Array<{ skillName: string; timestamp: string }>>([]);
@@ -58,6 +61,22 @@ export default function DstackPage() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* Center column */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          {/* Suggestion banner */}
+          {!isRunning && events.length === 0 && (
+            <SuggestionBanner
+              suggestions={suggestions}
+              loading={suggestionsLoading}
+              onRunSkill={(name) => handleRun(name, {}, { dryRun: false, force: false, model: 'flash' })}
+            />
+          )}
+          {!isRunning && events.length > 0 && suggestions.length > 0 && (
+            <SuggestionBanner
+              suggestions={suggestions}
+              loading={suggestionsLoading}
+              onRunSkill={(name) => handleRun(name, {}, { dryRun: false, force: false, model: 'flash' })}
+              compact
+            />
+          )}
           {/* Scrollable event thread */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {/* User command banners at top */}
@@ -97,6 +116,7 @@ export default function DstackPage() {
               allowedTools: s.allowedTools,
               nextSkill: s.nextSkill,
             })) : []}
+            suggestions={suggestions}
             isRunning={isRunning}
             currentSkill={currentSkill}
             toolCallCount={toolCallCount}

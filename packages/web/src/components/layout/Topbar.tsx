@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { GitBranch, Shield } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
+import HealthPulse from '../HealthPulse';
 
 const STAGES = ['planning', 'design', 'build/qa', 'ship', 'deploy'] as const;
 
@@ -72,8 +73,12 @@ export default function Topbar() {
         ))}
       </div>
 
-      {/* Right — git info + safety + provider */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        {/* Right — health pulse + git info + safety + provider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <HealthPulse />
+
+        <span style={{ width: 1, height: 16, background: 'var(--hairline)' }} />
+
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
           <GitBranch size={11} />
           main

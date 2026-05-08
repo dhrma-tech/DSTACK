@@ -4,8 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, GitBranch, Zap, History,
-  Box, Globe, Rocket,
+  LayoutDashboard, GitBranch, Zap, History, Clock,
+  Box, Globe, Rocket, BarChart3,
   Settings, ChevronLeft, ChevronRight, Terminal,
   Cpu, Shield
 } from 'lucide-react';
@@ -121,6 +121,10 @@ export default function AppSidebar() {
             <Link href="/artifacts" className={`sidebar-item${pathname === '/artifacts' ? ' active' : ''}`}>
               <Box size={18} />
               {!sidebarCollapsed && <span>Artifacts</span>}
+            </Link>
+            <Link href="/history" className={`sidebar-item${pathname === '/history' ? ' active' : ''}`}>
+              <Clock size={18} />
+              {!sidebarCollapsed && <span>History</span>}
             </Link>
             <Link href="/browser" className={`sidebar-item${pathname === '/browser' ? ' active' : ''}`}>
               <Globe size={18} />

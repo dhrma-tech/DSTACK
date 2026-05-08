@@ -40,7 +40,7 @@ import { apiClient } from './api-client';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [project, setProject] = useState<Project>(MOCK_PROJECT);
-  const [skills] = useState<Skill[]>(MOCK_SKILLS);
+  const [skills, setSkills] = useState<Skill[]>(MOCK_SKILLS);
   const [artifacts, setArtifacts] = useState<Artifact[]>(MOCK_ARTIFACTS);
   const [workflow, setWorkflow] = useState<WorkflowGraph>(MOCK_WORKFLOW);
   const [runs, setRuns] = useState<SkillRun[]>(MOCK_RUNS);
@@ -67,14 +67,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (projRes) {
-          const backendProject = projRes as {
-            name?: string;
-            safetyMode?: Project['safetyMode']['mode'];
-            providerMode?: string;
-            branch?: string;
-            head?: string;
-            stage?: string;
-          };
           setProject(prev => ({
             ...prev,
             name: projRes.name ?? prev.name,
@@ -88,13 +80,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           setWorkflow(prev => ({
             ...prev,
-            currentStage: backendProject.stage || prev.currentStage
+            currentStage: projRes.stage || prev.currentStage
           }));
         }
 
         if (skillsRes && Array.isArray(skillsRes)) {
-          // No setSkills available yet? Wait, line 56: const [skills] = useState<Skill[]>(MOCK_SKILLS);
-          // I should add setSkills to the state.
+          setSkills(skillsRes as unknown as Skill[]);
         }
         if (runsRes && Array.isArray(runsRes)) {
           setRuns(runsRes as unknown as SkillRun[]);
@@ -113,7 +104,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             summary: `${a.verdict ?? 'UNKNOWN'} result from /${a.skillName}`,
             warnings: [],
             content: a.content || { note: 'Artifact data available on click' }
-          })));
           })));
         }
       } catch (err) {

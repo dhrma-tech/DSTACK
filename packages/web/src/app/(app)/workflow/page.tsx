@@ -42,13 +42,6 @@ export default function WorkflowPage() {
           <p style={{ color: 'var(--muted)', fontSize: 14 }}>No workflow graph available. Connect the backend.</p>
         )}
 
-        {/* Suggested Next */}
-        {graph?.suggestedNextSkills && graph.suggestedNextSkills.length > 0 && (
-          <div style={{ marginTop: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-primary-soft)', border: '1px solid rgba(230,126,90,0.15)' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>Suggested next: </span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{graph.suggestedNextSkills.join(', ')}</span>
-          </div>
-        )}
 
         {graph && (
           <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginTop: 24 }}>
