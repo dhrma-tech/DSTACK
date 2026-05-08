@@ -1,182 +1,127 @@
 'use client';
 
-import React from 'react';
-import AppShell from '@/components/AppShell';
-import StatusBadge from '@/components/StatusBadge';
-import { useApp } from '@/lib/app-context';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  Zap, Box, History, ChevronRight, Play,
-  AlertTriangle, CheckCircle2, Clock,
-} from 'lucide-react';
+import AppShell from '@/components/AppShell';
+import Badge from '@/components/ui/Badge';
+import type { BadgeVariant } from '@/components/ui/Badge';
+import { useApp } from '@/lib/app-context';
+import { api, type HealthReport, type RunRecord } from '@/lib/api';
 
 export default function DashboardPage() {
-  const { project, skills, runs, artifacts, workflow, isLoading } = useApp();
+  const { project, runs } = useApp();
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [recentRuns, setRecentRuns] = useState<RunRecord[]>([]);
 
-  const completedSkills = workflow.nodes.filter((n: any) => n.status === 'complete').length;
-  const totalSkills = workflow.nodes.length;
-  const suggestedSkill = workflow.suggestedNextSkills[0];
-  const suggestedSkillData = skills.find((s: any) => s.name === suggestedSkill);
+  useEffect(() => {
+    api.getProjectHealth().then(setHealth).catch(() => null);
+    api.getRuns(10).then(setRecentRuns).catch(() => null);
+  }, []);
+
+  const healthColor = !health
+    ? 'var(--muted)'
+    : health.score >= 80 ? 'var(--success)'
+    : health.score >= 60 ? 'var(--warning)'
+    : 'var(--error)';
+
+  const displayRuns = recentRuns.length ? recentRuns : (runs as unknown as RunRecord[]);
 
   return (
-    <AppShell breadcrumbs={[{ label: 'Dashboard' }]}>
-      <div style={{ padding: '32px 32px 64px' }}>
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            <div>
-              <div className="skeleton skeleton-title" />
-              <div className="skeleton skeleton-text" style={{ width: '30%' }} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              {[1, 2, 3, 4].map((i: number) => <div key={i} className="skeleton skeleton-block" style={{ height: 100 }} />)}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div className="skeleton skeleton-block" style={{ height: 180 }} />
-              <div className="skeleton skeleton-block" style={{ height: 180 }} />
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Project Header */}
-            <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <h1 style={{ fontSize: 32, fontFamily: 'var(--font-serif)' }}>{project.name}</h1>
-            <span className="badge badge-neutral" style={{ textTransform: 'capitalize', letterSpacing: 0 }}>
-              {project.workflowStage}
-            </span>
-          </div>
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            {project.rootDisplayPath} · Provider: <strong>{project.provider.current}</strong>
-          </p>
-        </div>
+    <AppShell>
+      <div style={{ height: '100%', overflowY: 'auto', padding: 24, background: 'var(--canvas)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, color: 'var(--ink)', marginBottom: 24 }}>
+          {project.name}
+        </h1>
 
-        {/* Quick Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-          {[
-            { label: 'Workflow Progress', value: `${completedSkills}/${totalSkills}`, sub: 'skills completed', icon: Zap, color: 'var(--color-primary)' },
-            { label: 'Artifacts', value: `${project.artifactCounts.latest}`, sub: `${project.artifactCounts.stale} stale`, icon: Box, color: 'var(--color-accent-teal)' },
-            { label: 'Recent Runs', value: `${runs.length}`, sub: 'total runs', icon: History, color: 'var(--color-accent-blue)' },
-            { label: 'Blockers', value: `${workflow.blockers.length}`, sub: workflow.blockers.length ? 'action needed' : 'all clear', icon: AlertTriangle, color: workflow.blockers.length ? 'var(--color-warning)' : 'var(--color-success)' },
-          ].map((stat: any) => (
-            <div key={stat.label} className="card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' }}>{stat.label}</span>
-                <stat.icon size={16} style={{ color: stat.color }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, maxWidth: 1100 }}>
+          {/* Left column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Health score */}
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
+                <span style={{ fontSize: 64, fontFamily: 'var(--font-serif)', color: healthColor, lineHeight: 1 }}>
+                  {health?.score ?? '–'}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>{health?.status ?? 'Loading…'}</span>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-sans)', lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{stat.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Next Action + Workflow Mini */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 32 }}>
-          {/* Next Action */}
-          <div className="card" style={{ padding: 24, border: '1px solid var(--color-primary-soft)', background: 'linear-gradient(135deg, var(--color-surface) 0%, rgba(230,126,90,0.03) 100%)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-primary)', marginBottom: 12 }}>
-              Recommended Next
-            </div>
-            {suggestedSkillData ? (
-              <>
-                <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{suggestedSkillData.command}</div>
-                <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 16 }}>{suggestedSkillData.description}</p>
-                <Link href={`/skills`} className="btn btn-primary" style={{ textDecoration: 'none' }}>
-                  <Play size={14} /> Run Skill
-                </Link>
-              </>
-            ) : (
-              <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>All skills completed — review your workflow.</p>
-            )}
-          </div>
-
-          {/* Workflow Mini */}
-          <div className="card" style={{ padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' }}>Workflow</span>
-              <Link href="/workflow" style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                View Full <ChevronRight size={12} />
+              {health?.recommendations.map((r, i) => (
+                <p key={i} style={{ fontSize: 13, color: 'var(--body)', marginTop: 4, display: 'flex', gap: 6 }}>
+                  <span>•</span><span>{r}</span>
+                </p>
+              ))}
+              <Link href="/workflow" style={{ display: 'block', marginTop: 12, fontSize: 13, color: 'var(--coral)' }}>
+                View full health report →
               </Link>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {workflow.nodes.map((node: any, i: number) => (
-                <React.Fragment key={node.id}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                    borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 500,
-                    backgroundColor: node.status === 'complete' ? 'rgba(16,185,129,0.08)' :
-                      node.status === 'running' || node.status === 'ready' ? 'var(--color-primary-soft)' :
-                        'var(--color-surface-soft)',
-                    color: node.status === 'complete' ? 'var(--color-success)' :
-                      node.status === 'running' || node.status === 'ready' ? 'var(--color-primary)' :
-                        'var(--color-text-muted)',
-                  }}>
-                    {node.status === 'complete' && <CheckCircle2 size={12} />}
-                    {(node.status === 'running' || node.status === 'ready') && <Play size={10} />}
-                    {node.label}
+
+            {/* Recent activity */}
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 16 }}>
+              <h2 style={{ fontSize: 12, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)', marginBottom: 12 }}>
+                Recent Activity
+              </h2>
+              {displayRuns.slice(0, 10).map((run, i) => (
+                <div key={run.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 10, height: 40, borderBottom: '1px solid var(--hairline)' }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                    background: run.verdict === 'PASS' ? 'var(--success)' : run.verdict === 'FAIL' ? 'var(--error)' : 'var(--warning)',
+                  }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>
+                    /{run.skillName}
+                  </span>
+                  {run.verdict && <Badge variant={run.verdict as BadgeVariant}>{run.verdict}</Badge>}
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                    {run.startedAt ? new Date(run.startedAt).toLocaleString() : ''}
+                  </span>
+                  <Link href={`/runs/${run.id}`} style={{ fontSize: 12, color: 'var(--coral)' }}>→</Link>
+                </div>
+              ))}
+              {displayRuns.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>
+                  No runs yet. Complete a skill run to see history.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Right column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Artifact status */}
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 20 }}>
+              <h2 style={{ fontSize: 12, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)', marginBottom: 16 }}>
+                Artifact Status
+              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                {[
+                  { label: 'Total', value: project.artifactCounts.total },
+                  { label: 'Latest', value: project.artifactCounts.latest },
+                  { label: 'Stale', value: project.artifactCounts.stale, color: project.artifactCounts.stale > 0 ? 'var(--warning)' : undefined },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontFamily: 'var(--font-serif)', color: color ?? 'var(--ink)' }}>{value}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
                   </div>
-                  {i < workflow.nodes.length - 1 && <ChevronRight size={12} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />}
-                </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick links */}
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 16 }}>
+              <h2 style={{ fontSize: 12, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--muted)', marginBottom: 12 }}>
+                Quick Links
+              </h2>
+              {[
+                { href: '/dstack', label: 'Open Shell' },
+                { href: '/workflow', label: 'View Workflow' },
+                { href: '/artifacts', label: 'Browse Artifacts' },
+                { href: '/deploy', label: 'Deploy Status' },
+              ].map(({ href, label }) => (
+                <Link key={href} href={href} style={{ display: 'block', padding: '8px 0', fontSize: 13, color: 'var(--coral)', borderBottom: '1px solid var(--hairline)' }}>
+                  {label} →
+                </Link>
               ))}
             </div>
           </div>
         </div>
-
-        {/* Recent Runs */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-sans)' }}>Recent Runs</h2>
-            <Link href="/runs" style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>View all →</Link>
-          </div>
-          <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border-soft)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Run ID</th>
-                  <th>Skill</th>
-                  <th>Status</th>
-                  <th>Duration</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.slice(0, 5).map((run: any) => (
-                  <tr key={run.id} style={{ cursor: 'pointer' }}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{run.id}</td>
-                    <td style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{run.command}</td>
-                    <td><StatusBadge status={run.status as any} /></td>
-                    <td>{run.duration}</td>
-                    <td><Clock size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />{new Date(run.requestedAt).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Recent Artifacts */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-sans)' }}>Latest Artifacts</h2>
-            <Link href="/artifacts" style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>View all →</Link>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {artifacts.filter((a: any) => a.isLatest).slice(0, 3).map((art: any) => (
-              <div key={art.id} className="card card-interactive" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <Box size={16} style={{ color: 'var(--color-primary)' }} />
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{art.relativePath.split('/').pop()}</span>
-                </div>
-                <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>{art.summary}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>from {art.skillName}</span>
-                  {art.verdict && <StatusBadge status={art.verdict === 'PASS' ? 'success' : art.verdict === 'FAIL' ? 'error' : 'warning'} label={art.verdict} />}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-          </>
-        )}
       </div>
     </AppShell>
   );

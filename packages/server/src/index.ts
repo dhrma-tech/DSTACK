@@ -24,9 +24,30 @@ app.use('/api/project', projectRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/artifacts', artifactsRouter);
 
+app.get('/api/workflow/graph', (req, res) => {
+  res.json({
+    nodes: [
+      { id: 'office-hours', skillName: 'office-hours', label: 'Office Hours', phase: 'Planning', status: 'ready', verdict: null, timestamp: null, isStale: false },
+    ],
+    edges: []
+  });
+});
+
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+  const interval = setInterval(() => {
+    res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+  }, 30000);
+  req.on('close', () => clearInterval(interval));
+});
+
 attachRunRoutes(app);
 attachWorkflowRoutes(app);
 attachSandboxRoutes(app);
+
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

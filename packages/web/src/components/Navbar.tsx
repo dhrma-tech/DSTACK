@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { Rocket } from 'lucide-react';
 
 const Navbar = () => {
@@ -44,11 +45,11 @@ const Navbar = () => {
         fontWeight: 500,
         color: 'var(--color-text-secondary)'
       }}>
-        <a href="/workspace" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Workspace</a>
-        <a href="/" className="nav-link">Command Center</a>
-        <a href="/skills" className="nav-link">Skills</a>
-        <a href="/pipelines" className="nav-link">Pipelines</a>
-        <a href="/artifacts" className="nav-link">Artifacts</a>
+        <Link href="/workspace" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Workspace</Link>
+        <Link href="/" className="nav-link">Command Center</Link>
+        <Link href="/skills" className="nav-link">Skills</Link>
+        <Link href="/pipelines" className="nav-link">Pipelines</Link>
+        <Link href="/artifacts" className="nav-link">Artifacts</Link>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

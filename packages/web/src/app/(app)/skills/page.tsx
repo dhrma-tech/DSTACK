@@ -1,113 +1,102 @@
 'use client';
 
-import React, { useState } from 'react';
-import AppShell from '@/components/AppShell';
-import StatusBadge from '@/components/StatusBadge';
-import { useApp } from '@/lib/app-context';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Zap, Layers, Code2, Box, Play } from 'lucide-react';
+import AppShell from '@/components/AppShell';
+import { useApp } from '@/lib/app-context';
 
-const STAGE_ORDER = ['planning', 'design', 'qa', 'shipped'];
+const STAGES = ['all', 'planning', 'design', 'qa', 'ship', 'deploy'] as const;
+type StageFilter = typeof STAGES[number];
 
 export default function SkillsPage() {
   const { skills } = useApp();
-  const [search, setSearch] = useState('');
-  const [showHidden, setShowHidden] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<StageFilter>('all');
 
-  const filtered = skills
-    .filter(s => showHidden || !s.hidden)
-    .filter(s => s.name.includes(search.toLowerCase()) || s.command.includes(search.toLowerCase()));
-
-  const grouped = STAGE_ORDER.map((stage: string) => ({
-    stage,
-    skills: filtered.filter((s: any) => s.stage === stage),
-  })).filter(g => g.skills.length > 0);
-
-  const stageIcon = (stage: string) => {
-    if (stage === 'planning') return <Layers size={14} />;
-    if (stage === 'design') return <Box size={14} />;
-    if (stage === 'qa') return <Code2 size={14} />;
-    return <Zap size={14} />;
-  };
+  const filtered = activeFilter === 'all'
+    ? skills
+    : skills.filter(s => s.stage === activeFilter);
 
   return (
-    <AppShell breadcrumbs={[{ label: 'Skills' }]}>
-      <div style={{ padding: '32px' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 32, fontFamily: 'var(--font-serif)', marginBottom: 4 }}>Skill Library</h1>
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            Browse and run structured AI skills in your DStack environment.
-          </p>
+    <AppShell>
+      <div style={{ height: '100%', overflowY: 'auto', padding: 24, background: 'var(--canvas)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Skills</h1>
+
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
+          {STAGES.map(stage => (
+            <button
+              key={stage}
+              onClick={() => setActiveFilter(stage)}
+              style={{
+                padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                background: activeFilter === stage ? 'var(--surface-card)' : 'transparent',
+                border: `1px solid ${activeFilter === stage ? 'var(--hairline)' : 'transparent'}`,
+                color: activeFilter === stage ? 'var(--ink)' : 'var(--muted)',
+                borderBottom: activeFilter === stage ? '2px solid var(--coral)' : '1px solid transparent',
+              }}
+            >
+              {stage.charAt(0).toUpperCase() + stage.slice(1)}
+            </button>
+          ))}
         </div>
 
-        {/* Search + Filters */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)' }}>
-            <Search size={14} style={{ color: 'var(--color-text-muted)' }} />
-            <input className="input" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search skills..." style={{ border: 'none', padding: '8px 0', boxShadow: 'none' }} />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} />
-            Show hidden
-          </label>
-        </div>
-
-        {/* Grouped Skills */}
-        {grouped.map((group: any) => (
-          <div key={group.stage} style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: 'var(--color-text-muted)' }}>
-              {stageIcon(group.stage)}
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{group.stage}</span>
-              <span style={{ fontSize: 11 }}>({group.skills.length})</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border-soft)' }}>
-              {group.skills.map((skill: any) => (
-                <div key={skill.name} style={{
-                  display: 'grid', gridTemplateColumns: '2fr 1fr 100px 80px',
-                  alignItems: 'center', gap: 16, padding: '14px 20px',
-                  backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border-soft)',
-                  transition: 'background 0.1s', cursor: 'pointer',
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-canvas)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>{skill.name}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-muted)' }}>{skill.command}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{skill.description}</div>
-                  </div>
-                  <div>
-                    <StatusBadge
-                      status={skill.maturity === 'complete' ? 'success' : skill.maturity === 'partial' ? 'warning' : 'idle'}
-                      label={skill.maturity}
-                    />
-                  </div>
-                  <div>
-                    {skill.hasLatestArtifact
-                      ? <span style={{ fontSize: 12, color: 'var(--color-success)' }}>✓ Artifact</span>
-                      : <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>—</span>
-                    }
-                  </div>
-                  <div>
-                    {skill.available
-                      ? <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: 11, height: 28 }} title="Run this skill">
-                          <Play size={10} /> Run
-                        </button>
-                      : <button className="btn btn-secondary" disabled style={{ padding: '4px 12px', fontSize: 11, height: 28 }}
-                          title={`Missing: ${skill.requiresArtifacts.join(', ')}`}>
-                          Blocked
-                        </button>
-                    }
-                  </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, maxWidth: 1100 }}>
+          {filtered.map(skill => (
+            <div
+              key={skill.name}
+              style={{
+                background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 16,
+                opacity: skill.available ? 1 : 0.65, position: 'relative',
+              }}
+            >
+              {!skill.available && (
+                <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 14 }}>🔒</div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: 'var(--coral)' }}>
+                  /{skill.name}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '1px 6px', borderRadius: 9999, background: 'var(--canvas)', border: '1px solid var(--hairline)', color: 'var(--muted)' }}>
+                  {skill.model.includes('pro') || skill.model.includes('2.5') ? 'Pro' : 'Flash'}
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 10, lineHeight: 1.5 }}>
+                {skill.description}
+              </p>
+              {skill.requiresArtifacts.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--muted-soft)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Requires</div>
+                  {skill.requiresArtifacts.map(r => (
+                    <span key={r} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '1px 6px', borderRadius: 9999, background: 'var(--surface-card)', color: 'var(--muted)', border: '1px solid var(--hairline)', marginRight: 4 }}>
+                      /{r}
+                    </span>
+                  ))}
                 </div>
-              ))}
+              )}
+              <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {skill.hasLatestArtifact && skill.lastRunAt && (
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                    {new Date(skill.lastRunAt).toLocaleDateString()}
+                  </span>
+                )}
+                <Link
+                  href={`/dstack?skill=${skill.name}`}
+                  style={{
+                    marginLeft: 'auto', fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6,
+                    background: skill.available ? 'var(--coral)' : 'var(--surface-card)',
+                    color: skill.available ? '#fff' : 'var(--muted)',
+                    pointerEvents: skill.available ? 'auto' : 'none',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Run →
+                </Link>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        {filtered.length === 0 && (
+          <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 24 }}>No skills in this category.</p>
+        )}
       </div>
     </AppShell>
   );

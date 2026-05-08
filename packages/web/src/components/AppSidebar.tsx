@@ -5,42 +5,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, GitBranch, Zap, History,
-  Box, Globe, Rocket, BarChart3, Brain,
+  Box, Globe, Rocket,
   Settings, ChevronLeft, ChevronRight, Terminal,
-  Lock, Cpu, Shield
+  Cpu, Shield
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 
-const NAV_SECTIONS = [
-  {
-    label: 'Core',
-    items: [
-      { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/workflow', icon: GitBranch, label: 'Workflow' },
-      { href: '/skills', icon: Zap, label: 'Skills' },
-      { href: '/runs', icon: History, label: 'Runs' },
-    ],
-  },
-  {
-    label: 'Data',
-    items: [
-      { href: '/artifacts', icon: Box, label: 'Artifacts' },
-      { href: '/browser', icon: Globe, label: 'Browser / QA' },
-    ],
-  },
-  {
-    label: 'Ops',
-    items: [
-      { href: '/deploy', icon: Rocket, label: 'Deploy' },
-      { href: '/benchmarks', icon: BarChart3, label: 'Benchmarks' },
-      { href: '/learnings', icon: Brain, label: 'Learnings' },
-    ],
-  },
-];
-
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { project, sidebarCollapsed, setSidebarCollapsed, workflow, skills } = useApp();
+  const { project, sidebarCollapsed, setSidebarCollapsed, workflow } = useApp();
 
   const stages = [
     { id: 'planning', label: 'Planning', icon: LayoutDashboard },

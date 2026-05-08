@@ -5,29 +5,25 @@ import AppShell from '@/components/AppShell';
 import StatusBadge from '@/components/StatusBadge';
 import { useApp } from '@/lib/app-context';
 import {
-  Play, Terminal as TerminalIcon, FileCode, Search,
-  ChevronRight, Box, Cpu, CheckCircle2
+  Play, FileCode, Search,
+  Box, Cpu
 } from 'lucide-react';
 
 import { useActiveRun } from '@/hooks/useActiveRun';
 import EventThread from '@/components/shell/EventThread';
 
 export default function WorkspacePage() {
-  const { project, skills, artifacts } = useApp();
+  const { project, artifacts } = useApp();
   const [inputValue, setInputValue] = useState('');
-  const { startRun, events, status, respondToApproval, isExecuting } = useActiveRun();
+  const { startRun, events, status, respondToApproval } = useActiveRun();
 
   const handleRun = () => {
     if (!inputValue.trim()) return;
     
-    const firstToken = inputValue.trim().split(' ')[0];
-    const explicitSkillName = firstToken.startsWith('/') ? firstToken.substring(1) : firstToken;
-    const isSkillCommand = inputValue.startsWith('/') || skills.some((skill) => skill.name === explicitSkillName);
-
     // Check if it's a skill command
-    if (isSkillCommand) {
+    if (inputValue.startsWith('/')) {
       const parts = inputValue.split(' ');
-      const skillName = parts[0].replace(/^\//, '');
+      const skillName = parts[0].substring(1);
       const args: Record<string, string> = {};
       
       // Basic arg parsing
@@ -150,9 +146,9 @@ export default function WorkspacePage() {
               {status === 'idle' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {[
-                    { label: 'Run Office Hours', desc: 'Brainstorm product strategy with AI.', cmd: 'office-hours --idea "Build a SaaS"' },
-                    { label: 'Update Auto Plan', desc: 'Synchronize project state with current PRs.', cmd: 'autoplan --source "roadmap.json"' },
-                  ].map((s: any) => (
+                    { label: 'Run Office Hours', desc: 'Brainstorm product strategy with AI.', cmd: '/office-hours --idea "Build a SaaS"' },
+                    { label: 'Update Auto Plan', desc: 'Synchronize project state with current PRs.', cmd: '/autoplan --source "roadmap.json"' },
+                  ].map((s: { label: string; desc: string; cmd: string }) => (
                     <div key={s.label} className="card card-interactive" style={{ padding: 14, cursor: 'pointer' }}
                       onClick={() => setInputValue(s.cmd)}>
                       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{s.label}</div>
@@ -196,9 +192,9 @@ export default function WorkspacePage() {
             {/* Artifacts */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', marginBottom: 10 }}>
-                Artifacts ({artifacts.filter((a: any) => a.isLatest).length})
+                Artifacts ({artifacts.filter(a => a.isLatest).length})
               </div>
-              {artifacts.filter((a: any) => a.isLatest).map((art: any) => (
+              {artifacts.filter(a => a.isLatest).map(art => (
                 <div key={art.id} style={{
                   padding: '5px 8px', fontSize: 12, borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,

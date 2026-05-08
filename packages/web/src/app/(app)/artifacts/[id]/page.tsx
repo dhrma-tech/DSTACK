@@ -94,7 +94,7 @@ export default function ArtifactDetailPage() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>{artifact.version} (Current)</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Now</span>
                 </div>
-                {otherVersions.map((v: any) => (
+                {otherVersions.map((v: { id: string; version: string; createdAt: string }) => (
                   <Link key={v.id} href={`/artifacts/${v.id}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', transition: 'background 0.1s' }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)')}
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}

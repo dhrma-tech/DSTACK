@@ -1,84 +1,119 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ShieldAlert, Check, X, Fingerprint } from 'lucide-react';
-import type { ApprovalGate } from '@dstack/shared';
+import { useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 interface ApprovalGateCardProps {
-  description?: string;
-  gate?: ApprovalGate;
+  runId?: string;
+  toolName?: string;
+  description: string;
+  permissionLevel?: 'READ' | 'WRITE' | 'EXECUTE' | 'DESTRUCTIVE';
+  args?: Record<string, unknown>;
   onRespond: (decision: 'approve' | 'deny') => void;
   status?: 'pending' | 'approved' | 'denied';
 }
 
-export default function ApprovalGateCard({ description, gate, onRespond, status = gate?.status ?? 'pending' }: ApprovalGateCardProps) {
-  const body = gate?.description ?? description ?? 'Approval is required before this workflow can continue.';
+export default function ApprovalGateCard({
+  toolName,
+  description,
+  permissionLevel = 'EXECUTE',
+  args,
+  onRespond,
+  status = 'pending',
+}: ApprovalGateCardProps) {
+  const isPending = status === 'pending';
+
+  useEffect(() => {
+    if (!isPending) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); onRespond('approve'); }
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); onRespond('deny'); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isPending, onRespond]);
+
+  if (status === 'approved') {
+    return (
+      <div style={{ background: '#edf7ee', border: '1px solid #b2d9b5', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#2e7d32', display: 'flex', alignItems: 'center', gap: 8 }}>
+        ✓ Action Approved
+      </div>
+    );
+  }
+  if (status === 'denied') {
+    return (
+      <div style={{ background: '#fdecea', border: '1px solid #f0b0b0', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--error)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        ✗ Action Denied
+      </div>
+    );
+  }
+
+  const isDestructive = permissionLevel === 'DESTRUCTIVE';
+
   return (
-    <motion.div
-      className="card"
-      initial={{ opacity: 0, scale: 0.98, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      style={{
-      marginBottom: 16,
-      border: '2px solid var(--color-warning)',
-      backgroundColor: 'rgba(245,158,11,0.02)',
-      padding: '16px'
+    <div style={{
+      background: '#fff8e8',
+      border: '1px solid var(--warning)',
+      borderTop: '3px solid var(--warning)',
+      borderRadius: 10,
+      padding: '16px 20px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          backgroundColor: 'var(--color-warning)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white'
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
+        <span style={{ fontWeight: 500, fontSize: 14, color: 'var(--warning)' }}>Approval Required</span>
+        <span style={{
+          marginLeft: 'auto', fontSize: 10, padding: '2px 8px', borderRadius: 9999,
+          fontFamily: 'var(--font-mono)', fontWeight: 500,
+          background: isDestructive ? '#fdecea' : '#fff8e8',
+          color: isDestructive ? 'var(--error)' : '#7d5200',
+          border: `1px solid ${isDestructive ? '#f0b0b0' : '#e8c97a'}`,
         }}>
-          <ShieldAlert size={18} />
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-warning)' }}>
-            {gate?.title ?? 'Approval Required'}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-            Human-in-the-loop gate active{gate ? ` for ${gate.actor}` : ''}
-          </div>
-        </div>
+          {isDestructive ? '⚠ DESTRUCTIVE' : permissionLevel}
+        </span>
       </div>
 
-      <p style={{ fontSize: 14, lineHeight: 1.5, marginBottom: 16, fontWeight: 500 }}>
-        {body}
+      <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 10 }}>
+        DStack wants to execute the following action:
       </p>
 
-      {gate && (
-        <div style={{ display: 'grid', gap: 8, marginBottom: 16, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Fingerprint size={13} />
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{gate.artifactHash ?? 'pending hash'}</span>
-          </div>
-          <div><strong>Files:</strong> {gate.fileImpact.length > 0 ? gate.fileImpact.join(', ') : 'none'}</div>
-          <div><strong>Commands:</strong> {gate.commandImpact.length > 0 ? gate.commandImpact.join(', ') : 'none'}</div>
-          <div><strong>Safety:</strong> {gate.safetyMode}</div>
-        </div>
-      )}
+      {/* Code block */}
+      <div style={{
+        background: 'var(--surface-dark)', color: 'var(--on-dark)',
+        fontFamily: 'var(--font-mono)', fontSize: 12,
+        borderRadius: 6, padding: '10px 12px', marginBottom: 12,
+      }}>
+        {toolName && <div style={{ color: 'var(--coral)', marginBottom: 4 }}>{toolName}</div>}
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--on-dark-soft)' }}>
+          {description}
+          {args && Object.keys(args).length > 0 && '\n' + JSON.stringify(args, null, 2)}
+        </pre>
+      </div>
 
-      {status === 'pending' ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <motion.button whileTap={{ scale: 0.98 }} className="btn btn-primary" style={{ flex: 1, backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)', minHeight: 42 }} onClick={() => onRespond('approve')}>
-            <Check size={16} /> Approve & Build
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.98 }} className="btn btn-secondary" style={{ flex: 1, minHeight: 42 }} onClick={() => onRespond('deny')}>
-            <X size={16} /> Reject & Modify
-          </motion.button>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600,
-          color: status === 'approved' ? 'var(--color-success)' : 'var(--color-error)'
-        }}>
-          {status === 'approved' ? <Check size={14} /> : <X size={14} />}
-          Action {status === 'approved' ? 'Approved' : 'Denied'}
-        </div>
-      )}
-    </motion.div>
+      {/* Action row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <button
+          onClick={() => onRespond('approve')}
+          style={{
+            flex: 1, height: 36, borderRadius: 8, border: 'none',
+            background: 'var(--coral)', color: '#fff',
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+        >
+          Approve
+        </button>
+        <button
+          onClick={() => onRespond('deny')}
+          style={{
+            flex: 1, height: 36, borderRadius: 8,
+            border: '1px solid var(--error)', background: '#fff',
+            color: 'var(--error)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+        >
+          Deny
+        </button>
+      </div>
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>Y to approve · N to deny</p>
+    </div>
   );
 }

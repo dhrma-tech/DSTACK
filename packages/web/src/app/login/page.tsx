@@ -81,7 +81,7 @@ export default function LoginPage() {
         </button>
 
         <p style={{ marginTop: 'var(--spacing-xl)', fontSize: '13px', color: 'var(--color-muted)' }}>
-          Don't have an account? <Link href="/signup" className="text-link">Create one</Link>
+          Don&apos;t have an account? <Link href="/signup" className="text-link">Create one</Link>
         </p>
       </div>
 

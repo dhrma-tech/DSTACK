@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 
 interface JsonViewerProps {
-  data: any;
+  data: unknown;
   title?: string;
 }
 

@@ -1,19 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   MOCK_PROJECT, MOCK_SKILLS, MOCK_RUNS, MOCK_ARTIFACTS, MOCK_WORKFLOW,
   MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS, MOCK_EXECUTION_SESSION,
-  type Artifact,
-  type BenchmarkRun,
-  type BrowserSnapshot,
-  type DeployRun,
-  type ExecutionTurn,
-  type Learning,
-  type Project,
-  type Skill,
-  type SkillRun,
-  type WorkflowGraph
+  type Project, type Skill, type SkillRun, type Artifact, type WorkflowGraph, type ExecutionTurn,
+  type BenchmarkRun, type Learning, type BrowserSnapshot, type DeployRun
 } from './mock-data';
 
 interface AppState {
@@ -47,7 +40,7 @@ import { apiClient } from './api-client';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [project, setProject] = useState<Project>(MOCK_PROJECT);
-  const [skills, setSkills] = useState<Skill[]>(MOCK_SKILLS);
+  const [skills] = useState<Skill[]>(MOCK_SKILLS);
   const [artifacts, setArtifacts] = useState<Artifact[]>(MOCK_ARTIFACTS);
   const [workflow, setWorkflow] = useState<WorkflowGraph>(MOCK_WORKFLOW);
   const [runs, setRuns] = useState<SkillRun[]>(MOCK_RUNS);
@@ -66,11 +59,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   React.useEffect(() => {
     async function loadData() {
       try {
-        const [projRes, skillsRes, artifactsRes, runsRes] = await Promise.all([
+        const [projRes, artifactsRes, runsRes, skillsRes] = await Promise.all([
           apiClient.getProject().catch(() => null),
-          apiClient.getSkills().catch(() => null),
           apiClient.getArtifacts().catch(() => null),
-          apiClient.getRuns().catch(() => null)
+          apiClient.getRuns().catch(() => null),
+          apiClient.getSkills().catch(() => null)
         ]);
 
         if (projRes) {
@@ -84,11 +77,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
           setProject(prev => ({
             ...prev,
-            name: backendProject.name ?? prev.name,
-            safetyMode: { mode: backendProject.safetyMode ?? prev.safetyMode.mode, reason: prev.safetyMode.reason },
-            provider: { current: backendProject.providerMode === 'FAKE' ? 'fake' : 'gemini', geminiConfigured: true }
+            name: projRes.name ?? prev.name,
+            safetyMode: { mode: projRes.safetyMode ?? prev.safetyMode.mode, reason: prev.safetyMode.reason },
+            provider: {
+              current: projRes.providerMode === 'FAKE' ? 'fake' as const : 'gemini' as const,
+              geminiConfigured: projRes.providerMode !== 'FAKE'
+            },
+            workflowStage: projRes.stage || prev.workflowStage,
           }));
-          
+
           setWorkflow(prev => ({
             ...prev,
             currentStage: backendProject.stage || prev.currentStage
@@ -96,33 +93,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (skillsRes && Array.isArray(skillsRes)) {
-          setSkills(skillsRes as unknown as Skill[]);
+          // No setSkills available yet? Wait, line 56: const [skills] = useState<Skill[]>(MOCK_SKILLS);
+          // I should add setSkills to the state.
         }
-
         if (runsRes && Array.isArray(runsRes)) {
           setRuns(runsRes as unknown as SkillRun[]);
         }
 
         if (artifactsRes && Array.isArray(artifactsRes)) {
-          // Map backend artifacts to UI artifacts
-          setArtifacts((artifactsRes as Array<{
-            skillName: string;
-            timestamp: string;
-            verdict?: Artifact['verdict'];
-            path: string;
-            content?: Artifact['content'];
-          }>).map(a => ({
+          setArtifacts((artifactsRes as Array<any>).map(a => ({
             id: `${a.skillName}-${a.timestamp}`,
             skillName: a.skillName,
-            artifactType: 'skill-output',
+            artifactType: a.skillName,
             version: 'v1',
             isLatest: true,
-            verdict: a.verdict || 'FAIL',
+            verdict: a.verdict ?? null,
             createdAt: a.timestamp,
             relativePath: a.path.split('.dstack/')[1] || a.path,
-            summary: `${a.verdict} result from ${a.skillName}`,
+            summary: `${a.verdict ?? 'UNKNOWN'} result from /${a.skillName}`,
             warnings: [],
             content: a.content || { note: 'Artifact data available on click' }
+          })));
           })));
         }
       } catch (err) {

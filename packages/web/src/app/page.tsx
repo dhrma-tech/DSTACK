@@ -3,7 +3,7 @@ import Link from 'next/link';
 import CodeWindow from '@/components/CodeWindow';
 import {
   Play, Zap, ShieldCheck, ChevronRight, GitBranch,
-  Box, BarChart3, Terminal, Layers, Rocket,
+  Box, BarChart3, Terminal, Rocket,
 } from 'lucide-react';
 
 export default function Home() {
@@ -100,7 +100,7 @@ export default function Home() {
             { icon: Box, title: 'Artifact System', desc: 'Versioned, validated JSON artifacts with diff comparison and staleness tracking.' },
             { icon: Terminal, title: 'Developer CLI', desc: 'Full CLI with skill invocation, benchmarks, and deploy management. Web UI optional.' },
             { icon: BarChart3, title: 'Model Benchmarks', desc: 'Compare models across quality, latency, cost, and token usage on your own prompt suites.' },
-          ].map((f: any) => (
+          ].map((f: { icon: React.FC<{ size: number; style?: React.CSSProperties }>; title: string; desc: string }) => (
             <div key={f.title} className="card" style={{ padding: 24 }}>
               <f.icon size={24} style={{ color: 'var(--color-primary)', marginBottom: 12 }} />
               <h3 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-sans)', marginBottom: 6 }}>{f.title}</h3>
@@ -122,15 +122,15 @@ export default function Home() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
-            { cmd: 'office-hours', stage: 'Planning' },
-            { cmd: 'autoplan', stage: 'Planning' },
-            { cmd: 'design-consultation', stage: 'Design' },
-            { cmd: 'review', stage: 'QA' },
-            { cmd: 'qa', stage: 'QA' },
-            { cmd: 'ship', stage: 'Ship' },
-            { cmd: 'benchmark', stage: 'QA' },
-            { cmd: 'deploy', stage: 'Ship' },
-          ].map((s: any) => (
+            { cmd: '/office-hours', stage: 'Planning' },
+            { cmd: '/autoplan', stage: 'Planning' },
+            { cmd: '/design-consultation', stage: 'Design' },
+            { cmd: '/review', stage: 'QA' },
+            { cmd: '/qa', stage: 'QA' },
+            { cmd: '/ship', stage: 'Ship' },
+            { cmd: '/benchmark', stage: 'QA' },
+            { cmd: '/deploy', stage: 'Ship' },
+          ].map((s: { cmd: string; stage: string }) => (
             <div key={s.cmd} className="card card-interactive" style={{ padding: '14px 16px', textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{s.cmd}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{s.stage}</div>
@@ -152,13 +152,13 @@ export default function Home() {
         <div className="card" style={{ padding: 32, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[
-              { name: 'office-hours', done: true },
-              { name: 'autoplan', done: true },
-              { name: 'design', done: false, active: true },
-              { name: 'review', done: false },
-              { name: 'qa', done: false },
-              { name: 'ship', done: false },
-            ].map((step: any, i: number, arr: any[]) => (
+              { name: '/office-hours', done: true },
+              { name: '/autoplan', done: true },
+              { name: '/design', done: false, active: true },
+              { name: '/review', done: false },
+              { name: '/qa', done: false },
+              { name: '/ship', done: false },
+            ].map((step: { name: string; done: boolean; active?: boolean }, i: number, arr: { name: string; done: boolean; active?: boolean }[]) => (
               <React.Fragment key={step.name}>
                 <div style={{
                   padding: '10px 16px', borderRadius: 'var(--radius-md)',

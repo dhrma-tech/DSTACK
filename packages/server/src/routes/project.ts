@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { SafetyModeManager, DeployManager } from '@dstack/core';
+import type { SafetyModeName } from '@dstack/shared';
 import path from 'path';
 
-export const projectRouter = Router();
+export const projectRouter: RouterType = Router();
 
 const projectRoot = process.cwd().endsWith('server') ? 
   path.resolve(process.cwd(), '../../') : 
@@ -28,11 +29,11 @@ projectRouter.get('/', async (req, res) => {
 });
 
 projectRouter.post('/settings', async (req, res) => {
-  const { safetyMode, freezeState, providerMode } = req.body;
+  const { safetyMode, freezeState } = req.body as { safetyMode?: string; freezeState?: boolean };
 
   try {
     if (safetyMode) {
-      await safetyManager.setMode(safetyMode, null, `Manually set from UI to ${safetyMode}`);
+      await safetyManager.setMode(safetyMode as SafetyModeName, null, `Manually set from UI to ${safetyMode}`);
     }
 
     if (freezeState !== undefined) {
@@ -54,6 +55,9 @@ projectRouter.get('/health', (req, res) => {
   res.json({
     score: 100,
     status: 'HEALTHY',
-    topRecommendations: []
+    recommendations: []
   });
 });
+
+
+

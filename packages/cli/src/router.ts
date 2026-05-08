@@ -1,4 +1,4 @@
-import { ConfigManager, DeployManager, SafetyModeManager, SkillAuditor, SkillExecutor, shortHash, startDstackApiServer } from "@dstack/core";
+import { ConfigManager, DeployManager, SafetyModeManager, SkillAuditor, SkillExecutor, shortHash } from "@dstack/core";
 import type { ParsedCommand } from "./parser.js";
 import { helpText, resultText, skillCheckText, skillsText, versionText, type RuntimeStatus, skillsJson, skillCheckJson, resultJson } from "./printer.js";
 
@@ -84,7 +84,7 @@ export async function route(command: ParsedCommand): Promise<{ stdout: string; s
   }
 }
 
-async function handleServeCommand(command: ParsedCommand, projectRoot: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function handleServeCommand(_command: ParsedCommand, projectRoot: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   try {
     const { spawn } = await import('child_process');
     

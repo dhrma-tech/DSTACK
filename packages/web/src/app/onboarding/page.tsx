@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronRight, ChevronLeft, Check, Key, Cpu, Settings } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OnboardingPage() {
@@ -29,7 +29,7 @@ export default function OnboardingPage() {
         <div style={{ width: '100%', maxWidth: '800px', display: 'grid', gridTemplateColumns: '250px 1fr', gap: 'var(--spacing-xxl)' }}>
           {/* Progress Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {steps.map((s: any, i: number) => (
+            {steps.map((s: { title: string; description: string }, i: number) => (
               <div key={s.title} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                 <div style={{ 
                   width: '28px', 
@@ -61,12 +61,12 @@ export default function OnboardingPage() {
                 <h1 className="serif" style={{ fontSize: '36px', marginBottom: 'var(--spacing-md)' }}>The Thinking IDE</h1>
                 <p style={{ color: 'var(--color-body)', fontSize: '18px', lineHeight: 1.6, marginBottom: 'var(--spacing-xl)' }}>
                   DStack helps you orchestrate complex AI workflows through structured skills. 
-                  Let's configure your environment to start executing.
+                  Let&apos;s configure your environment to start executing.
                 </p>
                 <div className="card" style={{ backgroundColor: 'var(--color-surface-soft)', padding: '20px', display: 'flex', gap: '16px' }}>
                   <Settings className="text-link" />
                   <div style={{ fontSize: '14px', color: 'var(--color-muted)' }}>
-                    We'll guide you through setting up your first Model Provider and creating your initial workspace.
+                    We&apos;ll guide you through setting up your first Model Provider and creating your initial workspace.
                   </div>
                 </div>
               </div>
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
                 <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(93, 184, 114, 0.1)', color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                   <Check size={32} />
                 </div>
-                <h1 className="serif" style={{ fontSize: '36px', marginBottom: 'var(--spacing-md)' }}>You're ready.</h1>
+                <h1 className="serif" style={{ fontSize: '36px', marginBottom: 'var(--spacing-md)' }}>You&apos;re ready.</h1>
                 <p style={{ color: 'var(--color-body)', fontSize: '18px', lineHeight: 1.6, marginBottom: 'var(--spacing-xl)' }}>
                   Your workspace is initialized and your first skill is ready to run.
                 </p>

@@ -47,7 +47,7 @@ export default function RunDetailPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <h1 style={{ fontSize: 28, fontFamily: 'var(--font-serif)' }}>Run {run.id}</h1>
-            <StatusBadge status={run.status as any} />
+            <StatusBadge status={run.status as 'complete' | 'running' | 'error' | 'queued' | 'blocked'} />
             {run.verdict && <StatusBadge status={run.verdict === 'PASS' ? 'success' : run.verdict === 'FAIL' ? 'error' : 'warning'} label={run.verdict} />}
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--color-text-tertiary)' }}>

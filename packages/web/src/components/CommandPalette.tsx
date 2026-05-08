@@ -1,9 +1,10 @@
 'use client';
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Zap, Command, Lock, History, Clock, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Lock } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
-import { Skill } from '@/lib/mock-data';
+import type { Skill } from '@/lib/mock-data';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -12,146 +13,193 @@ interface CommandPaletteProps {
 }
 
 export default function CommandPalette({ isOpen, onClose, onSelectSkill }: CommandPaletteProps) {
-  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [activeIdx, setActiveIdx] = useState(0);
   const { skills } = useApp();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const filtered = query
+    ? skills.filter(s =>
+        s.name.toLowerCase().includes(query.toLowerCase()) ||
+        s.description.toLowerCase().includes(query.toLowerCase()) ||
+        s.stage.toLowerCase().includes(query.toLowerCase())
+      )
+    : skills;
+
+  const readySkills  = filtered.filter(s => s.available);
+  const blockedSkills = filtered.filter(s => !s.available);
+
+  const navigable = readySkills;
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, navigable.length - 1)); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter') {
+      const skill = navigable[activeIdx];
+      if (skill) { onSelectSkill(skill); onClose(); }
+    }
+  }, [isOpen, navigable, activeIdx, onClose, onSelectSkill]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
   useEffect(() => {
     if (isOpen) {
-      inputRef.current?.focus();
-      setSearch('');
+      setQuery('');
+      setActiveIdx(0);
+      setTimeout(() => inputRef.current?.focus(), 10);
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  useEffect(() => { setActiveIdx(0); }, [query]);
 
   if (!isOpen) return null;
 
-  const filteredSkills = skills.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.stage.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const readyToRun = filteredSkills.filter(s => s.status !== 'blocked');
-  const blocked = filteredSkills.filter(s => s.status === 'blocked');
-
   return (
-    <div 
+    <div
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
-        backgroundColor: 'rgba(24, 23, 21, 0.4)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: '15vh'
+        background: 'rgba(20,20,19,0.5)',
+        display: 'flex', justifyContent: 'center', paddingTop: '15vh',
       }}
       onClick={onClose}
     >
-      <div 
+      <div
         style={{
-          width: '100%', maxWidth: 640,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-premium)',
-          border: '1px solid var(--color-border)',
-          overflow: 'hidden',
-          display: 'flex', flexDirection: 'column'
+          width: 640, background: '#ffffff',
+          borderRadius: 12, border: '1px solid var(--hairline)',
+          overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          maxHeight: '70vh',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Search Input */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: '1px solid var(--color-border-soft)' }}>
-          <Search size={20} style={{ color: 'var(--color-text-muted)' }} />
-          <input 
+        {/* Input bar */}
+        <div style={{
+          height: 52, background: 'var(--surface-dark)',
+          display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px',
+        }}>
+          <span style={{ color: 'var(--coral)', fontFamily: 'var(--font-mono)', fontSize: 18, flexShrink: 0 }}>/</span>
+          <input
             ref={inputRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search skills, commands, or stages..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search skills…"
             style={{
-              flex: 1, border: 'none', outline: 'none', background: 'none',
-              fontSize: 16, color: 'var(--color-text-primary)', fontFamily: 'var(--font-sans)'
+              flex: 1, background: 'transparent', border: 'none', outline: 'none',
+              fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--on-dark)',
+              caretColor: 'var(--coral)',
             }}
           />
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-soft)', padding: '4px 6px', borderRadius: 4 }}>ESC</div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--on-dark-soft)' }}>
+            ESC to close
+          </span>
         </div>
 
-        {/* Results */}
-        <div style={{ maxHeight: 400, overflowY: 'auto', padding: '8px 0' }}>
-          {readyToRun.length > 0 && (
-            <div style={{ padding: '8px 16px 4px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>Ready to Run</div>
+        {/* Sections */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {readySkills.length > 0 && (
+            <>
+              <SectionLabel>Ready to run</SectionLabel>
+              {readySkills.map((skill) => (
+                <SkillRow
+                  key={skill.name}
+                  skill={skill}
+                  active={navigable.indexOf(skill) === activeIdx}
+                  onClick={() => { onSelectSkill(skill); onClose(); }}
+                />
+              ))}
+            </>
           )}
-          {readyToRun.map(skill => (
-            <button 
-              key={skill.id}
-              onClick={() => onSelectSkill(skill)}
-              style={{
-                width: '100%', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14,
-                border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
-                transition: 'background 0.1s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
-                <Zap size={16} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{skill.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{skill.stage} • 1.2m avg</div>
-              </div>
-              <ArrowRight size={14} style={{ color: 'var(--color-text-muted)' }} />
-            </button>
-          ))}
 
-          {blocked.length > 0 && (
-            <div style={{ padding: '16px 16px 4px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>Prerequisites Missing</div>
+          {blockedSkills.length > 0 && (
+            <>
+              <SectionLabel>Blocked</SectionLabel>
+              {blockedSkills.map(skill => (
+                <BlockedRow key={skill.name} skill={skill} />
+              ))}
+            </>
           )}
-          {blocked.map(skill => (
-            <div 
-              key={skill.id}
-              style={{
-                padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14,
-                opacity: 0.5, cursor: 'not-allowed'
-              }}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-surface-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                <Lock size={16} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{skill.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-error)' }}>Blocked by: autoplan</div>
-              </div>
-            </div>
-          ))}
 
-          {filteredSkills.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <div style={{ fontSize: 14, marginBottom: 4 }}>No skills found for &quot;{search}&quot;</div>
-              <div style={{ fontSize: 12 }}>Try searching for &quot;qa&quot;, &quot;plan&quot;, or &quot;ship&quot;.</div>
+          {filtered.length === 0 && (
+            <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
+              No skills found for &quot;{query}&quot;
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border-soft)', backgroundColor: 'var(--color-surface-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-muted)' }}>
-              <span style={{ padding: '2px 4px', backgroundColor: 'var(--color-surface)', borderRadius: 4, border: '1px solid var(--color-border-soft)' }}>↑↓</span> Navigate
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-muted)' }}>
-              <span style={{ padding: '2px 4px', backgroundColor: 'var(--color-surface)', borderRadius: 4, border: '1px solid var(--color-border-soft)' }}>↵</span> Select
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Command size={10} /> DStack CLI v0.8.2
-          </div>
+        <div style={{
+          height: 36, background: 'var(--surface-card)', borderTop: '1px solid var(--hairline)',
+          display: 'flex', alignItems: 'center', gap: 16, padding: '0 16px',
+          fontSize: 11, color: 'var(--muted)',
+        }}>
+          <span><kbd style={kbdStyle}>↑↓</kbd> navigate</span>
+          <span><kbd style={kbdStyle}>↵</kbd> select</span>
+          <span><kbd style={kbdStyle}>ESC</kbd> close</span>
         </div>
       </div>
     </div>
   );
 }
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ padding: '10px 16px 4px', fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--muted-soft)' }}>
+      {children}
+    </div>
+  );
+}
+
+function SkillRow({ skill, active, onClick }: { skill: Skill; active: boolean; onClick: () => void }) {
+  const modelLabel = skill.model.includes('pro') || skill.model.includes('2.5') ? 'Pro' : 'Flash';
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', height: 44, padding: '0 16px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        border: 'none', cursor: 'pointer', textAlign: 'left',
+        background: active ? 'var(--coral-bg)' : '#fff',
+        transition: 'background 0.1s',
+      }}
+      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3f0'; }}
+      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = '#fff'; }}
+    >
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+        /{skill.name}
+      </span>
+      <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {skill.description}
+      </span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '1px 6px', borderRadius: 9999, background: 'var(--canvas)', border: '1px solid var(--hairline)', color: 'var(--muted)', flexShrink: 0 }}>
+        {modelLabel}
+      </span>
+    </button>
+  );
+}
+
+function BlockedRow({ skill }: { skill: Skill }) {
+  return (
+    <div style={{
+      height: 44, padding: '0 16px',
+      display: 'flex', alignItems: 'center', gap: 10, cursor: 'default',
+    }}>
+      <Lock size={12} style={{ color: 'var(--muted-soft)', flexShrink: 0 }} />
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted-soft)' }}>
+        /{skill.name}
+      </span>
+      <span style={{ fontSize: 12, color: 'var(--muted-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {skill.description}
+      </span>
+    </div>
+  );
+}
+
+const kbdStyle: React.CSSProperties = {
+  background: '#fff', border: '1px solid var(--hairline)', borderRadius: 4,
+  padding: '1px 5px', fontFamily: 'var(--font-mono)', fontSize: 10,
+};

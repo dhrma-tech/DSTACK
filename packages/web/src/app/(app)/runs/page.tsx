@@ -1,81 +1,97 @@
 'use client';
 
-import React from 'react';
+import { useState } from 'react';
 import AppShell from '@/components/AppShell';
-import StatusBadge from '@/components/StatusBadge';
-import EmptyState from '@/components/EmptyState';
+import Badge from '@/components/ui/Badge';
+import type { BadgeVariant } from '@/components/ui/Badge';
 import { useApp } from '@/lib/app-context';
-import Link from 'next/link';
-import { Clock, ExternalLink, History } from 'lucide-react';
+import type { SkillRun } from '@/lib/mock-data';
 
 export default function RunsPage() {
-  const { runs, isLoading } = useApp();
+  const { runs } = useApp();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = runs.find(r => r.id === selectedId) as SkillRun | undefined ?? null;
 
   return (
-    <AppShell breadcrumbs={[{ label: 'Runs' }]}>
-      <div style={{ padding: '32px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 32, fontFamily: 'var(--font-serif)', marginBottom: 4 }}>Run History</h1>
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            Complete audit log of every skill execution in your environment.
-          </p>
+    <AppShell>
+      <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+        {/* Left list */}
+        <div style={{ width: 360, flexShrink: 0, borderRight: '1px solid var(--hairline)', overflowY: 'auto', background: '#fff' }}>
+          <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid var(--hairline)' }}>
+            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 400, color: 'var(--ink)' }}>Run History</h1>
+          </div>
+          {runs.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              No runs yet.
+            </div>
+          )}
+          {(runs as SkillRun[]).map(run => (
+            <div
+              key={run.id}
+              onClick={() => setSelectedId(run.id)}
+              style={{
+                padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--hairline)',
+                background: selectedId === run.id ? 'var(--coral-bg)' : '#fff',
+                borderLeft: selectedId === run.id ? '2px solid var(--coral)' : '2px solid transparent',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>
+                  /{run.skillName}
+                </span>
+                {run.verdict && <Badge variant={run.verdict as BadgeVariant}>{run.verdict}</Badge>}
+                {run.fakeMode && <Badge variant="FAKE">FAKE</Badge>}
+              </div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                <span>{new Date(run.requestedAt).toLocaleString()}</span>
+                <span>{run.duration}</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[1, 2, 3, 4, 5].map((i: number) => <div key={i} className="skeleton skeleton-block" style={{ height: 48 }} />)}
-          </div>
-        ) : runs.length === 0 ? (
-          <EmptyState icon={<History size={48} strokeWidth={1} />} title="No runs yet"
-            description="Execute a skill from the Skills page to see run history here." />
-        ) : (
-          <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border-soft)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Run ID</th>
-                  <th>Skill</th>
-                  <th>Provider</th>
-                  <th>Status</th>
-                  <th>Verdict</th>
-                  <th>Duration</th>
-                  <th>Time</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((run: any) => (
-                  <tr key={run.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{run.id}</td>
-                    <td style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{run.command}</td>
-                    <td>
-                      <span className="badge badge-neutral" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 10 }}>
-                        {run.fakeMode ? 'fake' : run.provider}
-                      </span>
-                    </td>
-                    <td><StatusBadge status={run.status as any} /></td>
-                    <td>
-                      {run.verdict
-                        ? <StatusBadge status={run.verdict === 'PASS' ? 'success' : run.verdict === 'FAIL' ? 'error' : 'warning'} label={run.verdict} />
-                        : <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>—</span>
-                      }
-                    </td>
-                    <td>{run.duration}</td>
-                    <td style={{ fontSize: 12 }}>
-                      <Clock size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-                      {new Date(run.requestedAt).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <Link href={`/runs/${run.id}`} style={{ color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <ExternalLink size={12} /> View
-                      </Link>
-                    </td>
-                  </tr>
+        {/* Right detail */}
+        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--canvas)', padding: 24 }}>
+          {!selected ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+              <p style={{ fontSize: 14, color: 'var(--muted)' }}>Select a run to view details</p>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 500, color: 'var(--coral)' }}>
+                  /{selected.skillName}
+                </h2>
+                {selected.verdict && <Badge variant={selected.verdict as BadgeVariant}>{selected.verdict}</Badge>}
+                {selected.fakeMode && <Badge variant="FAKE">FAKE</Badge>}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Duration', value: selected.duration },
+                  { label: 'Provider', value: selected.provider },
+                  { label: 'Model',    value: selected.model },
+                  { label: 'Dry Run', value: selected.dryRun ? 'Yes' : 'No' },
+                  { label: 'Status',  value: selected.status },
+                  { label: 'Run ID',  value: selected.id },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 8, padding: 12 }}>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>{value}</div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </div>
+              {selected.warnings.length > 0 && (
+                <div style={{ background: '#fff8e8', border: '1px solid #e8c97a', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#7d5200', marginBottom: 6 }}>Warnings</div>
+                  {selected.warnings.map((w, i) => (
+                    <p key={i} style={{ fontSize: 13, color: '#7d5200', marginTop: 2 }}>• {w}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </AppShell>
   );

@@ -1,84 +1,102 @@
 'use client';
 
-import React from 'react';
+import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
-import StatusBadge from '@/components/StatusBadge';
-import { useApp } from '@/lib/app-context';
-import { CheckCircle2, ChevronRight, Play, Lock } from 'lucide-react';
+import { api, type WorkflowGraph } from '@/lib/api';
+import Badge from '@/components/ui/Badge';
+import type { BadgeVariant } from '@/components/ui/Badge';
 
-const STAGE_COLORS: Record<string, string> = {
-  planning: 'var(--color-accent-blue)',
-  design: 'var(--color-accent-purple)',
-  qa: 'var(--color-warning)',
-  shipped: 'var(--color-success)',
-};
+function nodeColor(status: string) {
+  switch (status) {
+    case 'PASS': case 'complete': return { bg: '#edf7ee', border: '#b2d9b5', text: '#2e7d32' };
+    case 'REVISE':               return { bg: '#fff8e8', border: '#e8c97a', text: '#7d5200' };
+    case 'FAIL':                  return { bg: '#fdecea', border: '#f0b0b0', text: 'var(--error)' };
+    case 'running':               return { bg: 'var(--coral-bg)', border: 'var(--coral)', text: 'var(--coral)' };
+    case 'ready':                 return { bg: '#f0f5ff', border: '#a3b8f0', text: '#1a3a8f' };
+    case 'BLOCKED':               return { bg: 'var(--canvas)', border: 'var(--hairline)', text: 'var(--muted)' };
+    default:                      return { bg: 'var(--canvas)', border: 'var(--hairline)', text: 'var(--muted)' };
+  }
+}
 
 export default function WorkflowPage() {
-  const { workflow } = useApp();
+  const [graph, setGraph] = useState<WorkflowGraph | null>(null);
+  const [selected, setSelected] = useState<WorkflowGraph['nodes'][0] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getWorkflowGraph().then(setGraph).catch(() => null).finally(() => setLoading(false));
+  }, []);
 
   return (
-    <AppShell breadcrumbs={[{ label: 'Workflow' }]}>
-      <div style={{ padding: '32px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 32, fontFamily: 'var(--font-serif)', marginBottom: 4 }}>Workflow</h1>
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            Your skill execution pipeline — see what's done, what's next, and what's blocked.
-          </p>
-        </div>
+    <AppShell>
+      <div style={{ height: '100%', overflowY: 'auto', padding: 24, background: 'var(--canvas)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, marginBottom: 24 }}>Workflow</h1>
 
-        {/* Blockers */}
-        {workflow.blockers.length > 0 && (
-          <div style={{ marginBottom: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-warning)', marginBottom: 6, textTransform: 'uppercase' }}>Blockers</div>
-            {workflow.blockers.map((b: string, i: number) => (
-              <div key={i} style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>• {b}</div>
-            ))}
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}>
+            {[1,2,3,4,5].map(i => <div key={i} className="skeleton skeleton-block" />)}
           </div>
         )}
 
-        {/* Graph Visualization */}
-        <div className="card" style={{ padding: 32, overflowX: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 'max-content' }}>
-            {workflow.nodes.map((node: any, i: number) => (
-              <React.Fragment key={node.id}>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                  padding: '16px 20px', borderRadius: 'var(--radius-md)',
-                  border: `2px solid ${node.status === 'complete' ? 'var(--color-success)' :
-                    node.status === 'ready' || node.status === 'running' ? 'var(--color-primary)' :
-                      node.status === 'blocked' ? 'var(--color-warning)' : 'var(--color-border)'}`,
-                  backgroundColor: node.status === 'complete' ? 'rgba(16,185,129,0.04)' :
-                    node.status === 'ready' ? 'rgba(230,126,90,0.04)' : 'var(--color-surface)',
-                  minWidth: 140, textAlign: 'center',
-                  transition: 'all 0.2s ease', cursor: 'pointer',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {node.status === 'complete' && <CheckCircle2 size={14} style={{ color: 'var(--color-success)' }} />}
-                    {node.status === 'running' && <Play size={12} style={{ color: 'var(--color-primary)' }} />}
-                    {node.status === 'blocked' && <Lock size={12} style={{ color: 'var(--color-warning)' }} />}
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{node.label}</span>
-                  </div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em', color: STAGE_COLORS[node.stage] || 'var(--color-text-muted)' }}>
-                    {node.stage}
-                  </div>
-                  <StatusBadge status={node.status as any} />
-                </div>
-                {i < workflow.nodes.length - 1 && (
-                  <ChevronRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+        {!loading && !graph && (
+          <p style={{ color: 'var(--muted)', fontSize: 14 }}>No workflow graph available. Connect the backend.</p>
+        )}
 
         {/* Suggested Next */}
-        {workflow.suggestedNextSkills.length > 0 && (
+        {graph?.suggestedNextSkills && graph.suggestedNextSkills.length > 0 && (
           <div style={{ marginTop: 24, padding: 16, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-primary-soft)', border: '1px solid rgba(230,126,90,0.15)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>Suggested next: </span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{workflow.suggestedNextSkills.join(', ')}</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{graph.suggestedNextSkills.join(', ')}</span>
+          </div>
+        )}
+
+        {graph && (
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginTop: 24 }}>
+            <div style={{ flex: 1, maxWidth: 560 }}>
+              {graph.nodes.map((node, i) => {
+                const { bg, border, text } = nodeColor(node.status);
+                return (
+                  <div key={node.id}>
+                    {i > 0 && <div style={{ width: 1, height: 20, background: 'var(--hairline)', margin: '0 auto', marginLeft: 24 }} />}
+                    <div
+                      onClick={() => setSelected(node === selected ? null : node)}
+                      style={{
+                        height: 56, borderRadius: 10, border: `1px solid ${border}`,
+                        background: bg, cursor: 'pointer', padding: '0 16px',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        boxShadow: node === selected ? '0 0 0 2px var(--coral)' : 'none',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: text, flex: 1 }}>
+                        /{node.skillName ?? node.id}
+                      </span>
+                      {node.verdict && <Badge variant={node.verdict as BadgeVariant}>{node.verdict}</Badge>}
+                      <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                        {node.phase}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {selected && (
+              <div style={{ width: 320, background: '#fff', border: '1px solid var(--hairline)', borderRadius: 12, padding: 20 }}>
+                <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 500, color: 'var(--coral)', marginBottom: 8 }}>
+                  /{selected.skillName ?? selected.id}
+                </h2>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Phase: {selected.phase}</div>
+                {selected.verdict && <Badge variant={selected.verdict as BadgeVariant}>{selected.verdict}</Badge>}
+                {selected.timestamp && (
+                  <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+                    Last run: {new Date(selected.timestamp).toLocaleString()}
+                  </p>
+                )}
+                {selected.isStale && (
+                  <p style={{ fontSize: 12, color: 'var(--warning)', marginTop: 8 }}>⚠ Artifact is stale</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

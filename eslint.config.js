@@ -5,7 +5,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["**/dist/**", "**/.next/**", "node_modules/**", "coverage/**", ".dstack/**"]
+    ignores: ["**/dist/**", "node_modules/**", "coverage/**", ".dstack/**", "**/.next/**", "**/build/**"]
   },
   {
     rules: {

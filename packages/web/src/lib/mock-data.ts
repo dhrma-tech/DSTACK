@@ -64,7 +64,7 @@ export interface Artifact {
   verdict: "PASS" | "REVISE" | "FAIL" | null;
   summary: string | null;
   warnings: string[];
-  content?: any;
+  content?: unknown;
 }
 
 export interface BenchmarkResult {
