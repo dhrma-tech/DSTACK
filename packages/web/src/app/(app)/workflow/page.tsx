@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import { api, type WorkflowGraph } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import type { BadgeVariant } from '@/components/ui/Badge';
+import ConflictWarning from '@/components/ConflictWarning';
 
 function nodeColor(status: string) {
   switch (status) {
@@ -44,7 +45,9 @@ export default function WorkflowPage() {
 
 
         {graph && (
-          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginTop: 24 }}>
+          <div style={{ marginTop: 24 }}>
+            <ConflictWarning />
+            <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
             <div style={{ flex: 1, maxWidth: 560 }}>
               {graph.nodes.map((node, i) => {
                 const { bg, border, text } = nodeColor(node.status);
@@ -90,6 +93,7 @@ export default function WorkflowPage() {
                 )}
               </div>
             )}
+          </div>
           </div>
         )}
       </div>

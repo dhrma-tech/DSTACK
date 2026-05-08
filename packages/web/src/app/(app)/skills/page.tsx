@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useApp } from '@/lib/app-context';
+import { HelpCircle } from 'lucide-react';
+import SkillDocPanel from '@/components/SkillDocPanel';
 
 const STAGES = ['all', 'planning', 'design', 'qa', 'ship', 'deploy'] as const;
 type StageFilter = typeof STAGES[number];
@@ -11,6 +13,7 @@ type StageFilter = typeof STAGES[number];
 export default function SkillsPage() {
   const { skills } = useApp();
   const [activeFilter, setActiveFilter] = useState<StageFilter>('all');
+  const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
 
   const filtered = activeFilter === 'all'
     ? skills
@@ -58,6 +61,16 @@ export default function SkillsPage() {
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '1px 6px', borderRadius: 9999, background: 'var(--canvas)', border: '1px solid var(--hairline)', color: 'var(--muted)' }}>
                   {skill.model.includes('pro') || skill.model.includes('2.5') ? 'Pro' : 'Flash'}
                 </span>
+                <button
+                  onClick={() => setExpandedSkill(expandedSkill === skill.name ? null : skill.name)}
+                  style={{
+                    marginLeft: 'auto', background: expandedSkill === skill.name ? 'var(--coral-bg)' : 'transparent',
+                    border: 'none', cursor: 'pointer', color: expandedSkill === skill.name ? 'var(--coral)' : 'var(--muted)',
+                    display: 'flex', padding: 4, borderRadius: 4, position: 'relative', zIndex: 2
+                  }}
+                >
+                  <HelpCircle size={14} />
+                </button>
               </div>
               <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 10, lineHeight: 1.5 }}>
                 {skill.description}
@@ -91,6 +104,7 @@ export default function SkillsPage() {
                   Run →
                 </Link>
               </div>
+              {expandedSkill === skill.name && <SkillDocPanel skill={skill} />}
             </div>
           ))}
         </div>

@@ -111,7 +111,7 @@ export interface Artifact {
 export interface ArtifactDiff {
   v1: Artifact;
   v2: Artifact;
-  changes: Array<{ field: string; before: unknown; after: unknown }>;
+  semanticSummary?: string;
 }
 
 export interface WorkflowNode {
@@ -224,6 +224,15 @@ export interface WorkflowSuggestion {
   category: 'critical' | 'recommended' | 'optional';
 }
 
+export interface Template {
+  id: string;
+  name: string;
+  skillName: string;
+  inputs: Record<string, string>;
+  flags: Record<string, boolean | string>;
+  createdAt: string;
+}
+
 // ── SSE Event types ──────────────────────────────────────────────────────────
 
 export type ShellEvent =
@@ -273,7 +282,7 @@ export const api = {
   // Workflow
   getWorkflowGraph: () => apiFetch<WorkflowGraph>('/workflow/graph'),
   getWorkflowSuggestions: () => apiFetch<{ suggestions: WorkflowSuggestion[]; computedAt: string }>('/workflow/suggestions'),
-  getWorkflowConflicts: () => apiFetch<{ conflicts: Array<{ artifactA: string; artifactB: string; field: string; conflict: string; severity: string }>; computedAt: string }>('/workflow/conflicts'),
+  getWorkflowConflicts: () => apiFetch<{ conflicts: Array<{ artifactA: string; artifactB: string; field: string; conflict: string; severity: 'high' | 'medium' | 'low' }>; computedAt: string }>('/workflow/conflicts'),
 
   // History
   getHistory: (params?: { search?: string; skill?: string; verdict?: string; days?: number; limit?: number }) => {
@@ -292,6 +301,15 @@ export const api = {
     apiFetch<{ skillName: string; inputs: Record<string, string>; flags: Record<string, boolean | string> }>(`/history/${id}/rerun`, { method: 'POST' }),
   clearHistory: () =>
     apiFetch<{ cleared: boolean }>('/history', { method: 'DELETE' }),
+
+  // Templates
+  getTemplates: (skill?: string) => 
+    apiFetch<{ templates: Template[] }>(`/templates${skill ? `?skill=${skill}` : ''}`),
+  saveTemplate: (template: Omit<Template, 'id' | 'createdAt'>) =>
+    apiFetch<Template>('/templates', { method: 'POST', body: JSON.stringify(template) }),
+  deleteTemplate: (id: string) =>
+    apiFetch<{ success: boolean }>(`/templates/${id}`, { method: 'DELETE' }),
+
   startWorkflow: (prompt: string) =>
     apiFetch<{ runId: string }>('/workflows/runs', {
       method: 'POST',

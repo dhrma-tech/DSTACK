@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, HelpCircle } from 'lucide-react';
 import type { SkillSummary } from '@/lib/api';
+import TemplateManager from '../TemplateManager';
+import SkillDocPanel from '../SkillDocPanel';
 
 interface SkillRunnerPanelProps {
   skill: SkillSummary;
@@ -14,7 +16,8 @@ export default function SkillRunnerPanel({ skill, onClose, onRun }: SkillRunnerP
   const [dryRun, setDryRun] = useState(false);
   const [force, setForce] = useState(false);
   const [model, setModel] = useState<'flash' | 'pro' | 'custom'>('flash');
-  const [inputs] = useState<Record<string, string>>({});
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [showDocs, setShowDocs] = useState(false);
 
   const handleRun = () => {
     onRun(skill.name, inputs, { dryRun, force, model });
@@ -36,10 +39,28 @@ export default function SkillRunnerPanel({ skill, onClose, onRun }: SkillRunnerP
             {skill.model.includes('pro') || skill.model.includes('2.5') ? 'Pro' : 'Flash'}
           </span>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 4 }}>
-          <X size={16} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <TemplateManager 
+            skillName={skill.name} 
+            currentInputs={inputs} 
+            currentFlags={{ dryRun, force, model }} 
+            onLoadTemplate={(newInputs, newFlags) => {
+              setInputs(newInputs);
+              if (newFlags.dryRun !== undefined) setDryRun(newFlags.dryRun as boolean);
+              if (newFlags.force !== undefined) setForce(newFlags.force as boolean);
+              if (newFlags.model) setModel(newFlags.model as 'flash' | 'pro' | 'custom');
+            }} 
+          />
+          <button onClick={() => setShowDocs(!showDocs)} style={{ background: showDocs ? 'var(--coral-bg)' : 'transparent', border: 'none', cursor: 'pointer', color: showDocs ? 'var(--coral)' : 'var(--muted)', display: 'flex', padding: 4, borderRadius: 4 }}>
+            <HelpCircle size={16} />
+          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 4 }}>
+            <X size={16} />
+          </button>
+        </div>
       </div>
+
+      {showDocs && <SkillDocPanel skill={skill} />}
 
       {/* Prerequisites */}
       {skill.requiresArtifacts.length > 0 && (

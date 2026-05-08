@@ -7,14 +7,32 @@ import JsonViewer from '@/components/JsonViewer';
 import { useApp } from '@/lib/app-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Box, Download, Clock, History, AlertTriangle } from 'lucide-react';
+import { Box, Download, Clock, History, AlertTriangle, GitCompare } from 'lucide-react';
+import ArtifactDiff from '@/components/ArtifactDiff';
+import { api, type ArtifactDiff as ArtifactDiffType } from '@/lib/api';
 
 export default function ArtifactDetailPage() {
   const params = useParams();
   const artifactId = params.id as string;
   const { artifacts } = useApp();
+  const [compareVersion, setCompareVersion] = React.useState<string | null>(null);
+  const [diffData, setDiffData] = React.useState<ArtifactDiffType | null>(null);
+  const [diffLoading, setDiffLoading] = React.useState(false);
 
   const artifact = artifacts.find(a => a.id === artifactId);
+
+  React.useEffect(() => {
+    if (compareVersion && artifact) {
+      setDiffLoading(true);
+      // v1 is old (compareVersion), v2 is new (current artifact)
+      api.getArtifactDiff(artifact.skillName, compareVersion, artifact.version)
+        .then(setDiffData)
+        .catch(() => setDiffData(null))
+        .finally(() => setDiffLoading(false));
+    } else {
+      setDiffData(null);
+    }
+  }, [compareVersion, artifact]);
 
   if (!artifact) {
     return (
@@ -57,9 +75,21 @@ export default function ArtifactDetailPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, height: 'calc(100vh - 250px)' }}>
-          {/* JSON Viewer */}
-          <div style={{ height: '100%' }}>
-            <JsonViewer data={artifact.content || { error: "No content available" }} title={filename} />
+          {/* Main Viewer */}
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {compareVersion ? (
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                {diffLoading ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading diff...</div>
+                ) : diffData ? (
+                  <ArtifactDiff v1={diffData.v1} v2={diffData.v2} semanticSummary={diffData.semanticSummary} />
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--error)' }}>Failed to load diff</div>
+                )}
+              </div>
+            ) : (
+              <JsonViewer data={artifact.content || { error: "No content available" }} title={filename} />
+            )}
           </div>
 
           {/* Sidebar */}
@@ -95,13 +125,28 @@ export default function ArtifactDetailPage() {
                   <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Now</span>
                 </div>
                 {otherVersions.map((v: { id: string; version: string; createdAt: string }) => (
-                  <Link key={v.id} href={`/artifacts/${v.id}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', transition: 'background 0.1s' }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{v.version}</span>
-                    <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{new Date(v.createdAt).toLocaleDateString()}</span>
-                  </Link>
+                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Link href={`/artifacts/${v.id}`} style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', transition: 'background 0.1s' }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{v.version}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{new Date(v.createdAt).toLocaleDateString()}</span>
+                    </Link>
+                    <button
+                      onClick={() => setCompareVersion(compareVersion === v.version ? null : v.version)}
+                      title="Compare with current"
+                      style={{
+                        padding: '4px 6px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                        background: compareVersion === v.version ? 'var(--coral-bg)' : 'transparent',
+                        color: compareVersion === v.version ? 'var(--coral)' : 'var(--muted)',
+                      }}
+                      onMouseEnter={e => { if (compareVersion !== v.version) e.currentTarget.style.color = 'var(--ink)' }}
+                      onMouseLeave={e => { if (compareVersion !== v.version) e.currentTarget.style.color = 'var(--muted)' }}
+                    >
+                      <GitCompare size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>

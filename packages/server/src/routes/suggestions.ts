@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { ArtifactStore, ConflictScanner } from '@dstack/core';
+import path from 'path';
 
 const router = Router();
+
+const getDStackDir = () => path.join(process.cwd(), '.dstack');
 
 interface Suggestion {
   skill: string;
@@ -43,9 +47,29 @@ router.get('/suggestions', (_req: Request, res: Response) => {
 });
 
 // GET /api/workflow/conflicts — cross-skill conflict detection
-router.get('/conflicts', (_req: Request, res: Response) => {
-  // Placeholder — will be implemented in Phase 2
-  res.json({ conflicts: [], computedAt: new Date().toISOString() });
+router.get('/conflicts', async (_req: Request, res: Response) => {
+  try {
+    const store = new ArtifactStore(getDStackDir());
+    const scanner = new ConflictScanner(store);
+    
+    // In real impl, we fetch the real graph, but for demo we pass a mock one 
+    // since we don't have direct access to graph store here yet
+    const mockGraph = {
+      nodes: [
+        { id: '1', skillName: 'product-manager', status: 'PASS' },
+        { id: '2', skillName: 'system-architect', status: 'PASS' },
+        { id: '3', skillName: 'ui-designer', status: 'PASS' },
+        { id: '4', skillName: 'frontend-developer', status: 'PASS' }
+      ],
+      edges: []
+    } as any;
+    
+    const conflicts = await scanner.scan(mockGraph);
+    res.json({ conflicts, computedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Failed to scan conflicts:', err);
+    res.status(500).json({ error: 'Failed to scan conflicts' });
+  }
 });
 
 export { router as suggestionsRouter };

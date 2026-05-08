@@ -34,4 +34,5 @@ export * from "./upgrade/manager.js";
 export * from "./workflow/graph.js";
 export * from "./workflow/iteration-tracker.js";
 export * from "./workflow/slop-scanner.js";
+export * from "./workflow/conflict-scanner.js";
 export * from "./api/server.js";
