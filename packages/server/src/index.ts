@@ -10,6 +10,7 @@ import { attachWorkflowRoutes } from './routes/workflows';
 import { historyRouter } from './routes/history';
 import { suggestionsRouter } from './routes/suggestions';
 import { templatesRouter } from './routes/templates';
+import { learningsRouter } from './routes/learnings';
 import notifier from 'node-notifier';
 import { globalSkillRunner } from './stream/skill-runner';
 
@@ -31,6 +32,7 @@ app.use('/api/artifacts', artifactsRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/workflow', suggestionsRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/learnings', learningsRouter);
 
 app.get('/api/workflow/graph', (req, res) => {
   res.json({

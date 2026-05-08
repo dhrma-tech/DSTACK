@@ -3,7 +3,7 @@
 import React from 'react';
 
 export type BadgeVariant =
-  | 'PASS' | 'FAIL' | 'REVISE' | 'RUNNING' | 'BLOCKED' | 'FAKE'
+  | 'PASS' | 'FAIL' | 'REVISE' | 'RUNNING' | 'BLOCKED' | 'FAKE' | 'PENDING'
   | 'ALLOW' | 'REQUIRE_APPROVAL' | 'DENY'
   | 'NORMAL' | 'CAREFUL' | 'GUARD'
   | 'success' | 'error' | 'warning' | 'neutral' | 'info' | 'coral';
@@ -15,6 +15,7 @@ const VARIANT_STYLES: Record<BadgeVariant, { bg: string; color: string; border: 
   RUNNING:          { bg: 'var(--coral-bg)',  color: 'var(--coral)', border: '#f0c4b3' },
   BLOCKED:          { bg: 'var(--canvas)',    color: 'var(--muted)', border: 'var(--hairline)' },
   FAKE:             { bg: '#fff8e8',          color: '#7d5200',  border: '#e8c97a' },
+  PENDING:          { bg: '#fef3c7',          color: '#92400e',  border: '#fde68a' },
   ALLOW:            { bg: '#edf7ee',          color: '#2e7d32',  border: '#b2d9b5' },
   REQUIRE_APPROVAL: { bg: '#fff8e8',          color: '#7d5200',  border: '#e8c97a' },
   DENY:             { bg: '#fdecea',          color: '#c64545',  border: '#f0b0b0' },

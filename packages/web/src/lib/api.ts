@@ -154,10 +154,11 @@ export interface SafetyModeState {
 
 export interface LearningEntry {
   id: string;
-  topic: string;
-  insight: string;
-  appliesTo: string[];
-  source: string;
+  skillName: string;
+  pattern: string;
+  context: string;
+  sourceRunId: string;
+  status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
 
@@ -354,10 +355,12 @@ export const api = {
     apiFetch<SafetyModeState>('/safety/mode', { method: 'POST', body: JSON.stringify({ mode }) }),
 
   // Learnings
-  getLearnings: (query?: string) => apiFetch<LearningEntry[]>(`/learnings${query ? `?q=${encodeURIComponent(query)}` : ''}`),
-  addLearning: (entry: Omit<LearningEntry, 'id' | 'createdAt'>) =>
-    apiFetch<LearningEntry>('/learnings', { method: 'POST', body: JSON.stringify(entry) }),
-  deleteLearning: (id: string) => apiFetch<{ deleted: boolean }>(`/learnings/${id}`, { method: 'DELETE' }),
+  getLearnings: (query?: string) => apiFetch<LearningEntry[]>('/learnings'),
+  updateLearningStatus: (id: string, status: 'approved' | 'rejected') =>
+    apiFetch<{ success: boolean }>(`/learnings/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  extractLearning: (data: { runId: string, skillName: string, pattern: string, context: string }) =>
+    apiFetch<LearningEntry>('/learnings/extract', { method: 'POST', body: JSON.stringify(data) }),
+  deleteLearning: (id: string) => apiFetch<{ success: boolean }>(`/learnings/${id}`, { method: 'DELETE' }),
 
   // Benchmarks
   getBenchmarks: () => apiFetch<BenchmarkRun[]>('/benchmarks'),
