@@ -35,3 +35,16 @@ skillsRouter.get('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to list skills' });
   }
 });
+
+skillsRouter.get('/market', async (req, res) => {
+  const marketSkills = [
+    { name: 'deep-audit', description: 'Complete security and performance audit of the codebase.', category: 'Quality', author: 'DStack Official', installs: '12.4k' },
+    { name: 'make-landing', description: 'Generate a high-fidelity landing page for your project.', category: 'Marketing', author: 'DStack Official', installs: '8.2k' },
+    { name: 'python-optimize', description: 'Refactor and optimize Python scripts for better performance.', category: 'Engineering', author: 'Community', installs: '4.1k' },
+    { name: 'figma-to-code', description: 'Convert Figma design descriptions into React components.', category: 'Design', author: 'DesignOps', installs: '22.1k' },
+    { name: 'db-architect', description: 'Design scalable database schemas based on project requirements.', category: 'Architecture', author: 'DStack Official', installs: '15.7k' },
+    { name: 'edge-tester', description: 'Fuzz test your APIs for edge case vulnerabilities.', category: 'Quality', author: 'SecurityBot', installs: '3.9k' },
+  ];
+  res.json(marketSkills);
+});
+

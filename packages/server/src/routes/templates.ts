@@ -77,4 +77,15 @@ router.delete('/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+router.get('/scaffold', (req: Request, res: Response) => {
+  const scaffolds = [
+    { id: 'sc-next-app', name: 'Next.js App', description: 'Complete SaaS starter with Auth and Stripe integration.', tech: 'Next.js, Tailwind, Prisma', difficulty: 'Beginner' },
+    { id: 'sc-python-api', name: 'Python FastAPI', description: 'High-performance async API with PostgreSQL and Redis.', tech: 'FastAPI, SQLAlchemy, Pydantic', difficulty: 'Intermediate' },
+    { id: 'sc-react-ui', name: 'React UI Library', description: 'Component library starter with Storybook and Rollup.', tech: 'React, TypeScript, Storybook', difficulty: 'Advanced' },
+    { id: 'sc-node-cli', name: 'Node.js CLI Tool', description: 'Command-line tool template with Commander and Inquirer.', tech: 'Node.js, TypeScript, Yargs', difficulty: 'Beginner' },
+  ];
+  res.json(scaffolds);
+});
+
 export { router as templatesRouter };
+

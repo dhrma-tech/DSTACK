@@ -152,6 +152,22 @@ export interface SafetyModeState {
   reason: string | null;
 }
 
+export interface ScaffoldTemplate {
+  id: string;
+  name: string;
+  description: string;
+  tech: string;
+  difficulty: string;
+}
+
+export interface MarketSkill {
+  name: string;
+  description: string;
+  category: string;
+  author: string;
+  installs: string;
+}
+
 export interface LearningEntry {
   id: string;
   skillName: string;
@@ -254,6 +270,7 @@ export const api = {
 
   // Skills
   getSkills: () => apiFetch<SkillSummary[]>('/skills'),
+  getMarketSkills: () => apiFetch<MarketSkill[]>('/skills/market'),
   getSkill: (name: string) => apiFetch<SkillDetail>(`/skills/${name}`),
   runSkill: (name: string, inputs: Record<string, string> = {}, flags?: { dryRun?: boolean; force?: boolean; provider?: string }) =>
     apiFetch<{ runId: string }>(`/skills/${name}/run`, {
@@ -265,6 +282,18 @@ export const api = {
   getRuns: (limit?: number) => apiFetch<RunRecord[]>(`/runs${limit ? `?limit=${limit}` : ''}`),
   getRun: (runId: string) => apiFetch<RunRecord>(`/runs/${runId}`),
   stopRun: (runId: string) => apiFetch<{ stopped: boolean }>(`/runs/${runId}/stop`, { method: 'POST' }),
+  streamRun: (runId: string, onEvent: (event: ShellEvent) => void, onComplete: () => void) => {
+    const es = new EventSource(`${API_BASE}/runs/${runId}/stream`);
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data) as ShellEvent;
+        onEvent(data);
+        if (data.type === 'complete') { es.close(); onComplete(); }
+      } catch { /* ignore parse errors */ }
+    };
+    es.onerror = () => { es.close(); onComplete(); };
+    return () => es.close();
+  },
 
   // Approvals
   respondToApproval: (runId: string, decision: 'approve' | 'deny') =>
@@ -306,6 +335,7 @@ export const api = {
   // Templates
   getTemplates: (skill?: string) => 
     apiFetch<{ templates: Template[] }>(`/templates${skill ? `?skill=${skill}` : ''}`),
+  getScaffolds: () => apiFetch<ScaffoldTemplate[]>('/templates/scaffold'),
   saveTemplate: (template: Omit<Template, 'id' | 'createdAt'>) =>
     apiFetch<Template>('/templates', { method: 'POST', body: JSON.stringify(template) }),
   deleteTemplate: (id: string) =>
@@ -395,18 +425,7 @@ export const apiClient = {
   getRuns: api.getRuns,
   runSkill: (skillName: string, args: Record<string, string> = {}) =>
     api.runSkill(skillName, args),
-  streamRun: (runId: string, onEvent: (event: ShellEvent) => void, onComplete: () => void) => {
-    const es = new EventSource(`${API_BASE}/runs/${runId}/stream`);
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data) as ShellEvent;
-        onEvent(data);
-        if (data.type === 'complete') { es.close(); onComplete(); }
-      } catch { /* ignore parse errors */ }
-    };
-    es.onerror = () => { es.close(); onComplete(); };
-    return () => es.close();
-  },
+  streamRun: api.streamRun,
   respondToApproval: (runId: string, decision: 'approve' | 'deny') =>
     api.respondToApproval(runId, decision),
   updateProjectSettings: () => Promise.resolve({ success: true }),

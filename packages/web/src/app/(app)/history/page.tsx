@@ -16,6 +16,7 @@ export default function HistoryPage() {
   const [verdictFilter, setVerdictFilter] = useState<string>('');
   const [daysFilter, setDaysFilter] = useState<number>(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [timelineIndex, setTimelineIndex] = useState(0);
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -87,6 +88,46 @@ export default function HistoryPage() {
             <Trash2 size={13} /> Clear
           </button>
         </div>
+        
+        {/* Timeline Replay */}
+        <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 16, padding: 20, marginBottom: 24, position: 'relative' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <RotateCcw size={16} /> Workflow Timeline Replay
+            </h3>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
+              {entries.length > 0 ? `Step ${entries.length - timelineIndex} of ${entries.length}` : 'No history'}
+            </div>
+          </div>
+          
+          <div style={{ height: 40, position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ height: 4, width: '100%', background: 'var(--hairline)', borderRadius: 2 }} />
+            {entries.map((_, i) => (
+              <div 
+                key={i}
+                onClick={() => setTimelineIndex(i)}
+                style={{ 
+                  position: 'absolute', left: `${(i / (entries.length - 1)) * 100}%`,
+                  width: 12, height: 12, borderRadius: '50%', background: timelineIndex === i ? 'var(--coral)' : 'var(--muted-soft)',
+                  cursor: 'pointer', transform: 'translateX(-50%)', border: timelineIndex === i ? '3px solid #fff' : 'none',
+                  boxShadow: timelineIndex === i ? '0 0 0 1px var(--coral)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--canvas)', borderRadius: 10, display: 'flex', gap: 12, alignItems: 'center' }}>
+            {entries[timelineIndex] && (
+              <>
+                <Badge variant={entries[timelineIndex].verdict as any}>{entries[timelineIndex].verdict || 'PENDING'}</Badge>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Executed /{entries[timelineIndex].skillName}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>{new Date(entries[timelineIndex].startedAt).toLocaleString()}</span>
+              </>
+            )}
+          </div>
+        </div>
+
 
         {/* Search + Filters */}
         <div style={{
