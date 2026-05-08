@@ -10,6 +10,8 @@ import { attachWorkflowRoutes } from './routes/workflows';
 import { historyRouter } from './routes/history';
 import { suggestionsRouter } from './routes/suggestions';
 import { templatesRouter } from './routes/templates';
+import notifier from 'node-notifier';
+import { globalSkillRunner } from './stream/skill-runner';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -57,6 +59,25 @@ attachSandboxRoutes(app);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Notifications
+globalSkillRunner.globalEmitter.on('global_event', ({ event }) => {
+  if (event.type === 'complete') {
+    notifier.notify({
+      title: 'DStack Skill Run',
+      message: `/${event.skillName} finished with status: ${event.status}`,
+      sound: true,
+      wait: false
+    });
+  } else if (event.type === 'approval-required') {
+    notifier.notify({
+      title: 'DStack Approval Required',
+      message: `/${event.toolName} requires your approval to proceed.`,
+      sound: true,
+      wait: false
+    });
+  }
 });
 
 app.listen(port, () => {

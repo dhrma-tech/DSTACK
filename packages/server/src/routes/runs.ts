@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { globalSkillRunner } from '../stream/skill-runner';
+import { globalChainRunner } from '../stream/chain-runner';
 
 export const runsRouter = Router();
 
@@ -113,5 +114,44 @@ export const attachRunRoutes = (app: import('express').Express) => {
 
     globalSkillRunner.respondToApproval(runId, decision);
     res.json({ success: true });
+  });
+
+  app.post('/api/chain/run', (req, res) => {
+    const { chain, inputs } = req.body;
+    if (!Array.isArray(chain)) {
+      return res.status(400).json({ error: 'chain must be an array of skill names' });
+    }
+    const chainId = globalChainRunner.startChain(chain, inputs || {});
+    res.json({ chainId });
+  });
+
+  app.get('/api/chain/:chainId/stream', (req, res) => {
+    const { chainId } = req.params;
+    const chainState = globalChainRunner.getChain(chainId);
+    
+    if (!chainState) {
+      return res.status(404).end();
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const skillStartListener = (data: any) => res.write(`data: ${JSON.stringify({ type: 'skill_start', ...data })}\n\n`);
+    const skillEventListener = (data: any) => res.write(`data: ${JSON.stringify({ type: 'skill_event', ...data })}\n\n`);
+    const chainCompleteListener = (data: any) => {
+      res.write(`data: ${JSON.stringify({ type: 'chain_complete', ...data })}\n\n`);
+      res.end();
+    };
+
+    chainState.emitter.on('skill_start', skillStartListener);
+    chainState.emitter.on('skill_event', skillEventListener);
+    chainState.emitter.on('chain_complete', chainCompleteListener);
+
+    req.on('close', () => {
+      chainState.emitter.off('skill_start', skillStartListener);
+      chainState.emitter.off('skill_event', skillEventListener);
+      chainState.emitter.off('chain_complete', chainCompleteListener);
+    });
   });
 };

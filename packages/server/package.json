@@ -17,11 +17,13 @@
     "@dstack/shared": "workspace:*",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "helmet": "^8.1.0"
+    "helmet": "^8.1.0",
+    "node-notifier": "^10.0.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/node-notifier": "^8.0.5",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }

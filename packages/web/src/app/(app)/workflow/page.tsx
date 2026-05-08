@@ -6,6 +6,8 @@ import { api, type WorkflowGraph } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import type { BadgeVariant } from '@/components/ui/Badge';
 import ConflictWarning from '@/components/ConflictWarning';
+import ChainProgress from '@/components/ChainProgress';
+import { Play } from 'lucide-react';
 
 function nodeColor(status: string) {
   switch (status) {
@@ -23,6 +25,8 @@ export default function WorkflowPage() {
   const [graph, setGraph] = useState<WorkflowGraph | null>(null);
   const [selected, setSelected] = useState<WorkflowGraph['nodes'][0] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeChainId, setActiveChainId] = useState<string | null>(null);
+  const [activeChain, setActiveChain] = useState<string[]>([]);
 
   useEffect(() => {
     api.getWorkflowGraph().then(setGraph).catch(() => null).finally(() => setLoading(false));
@@ -31,7 +35,29 @@ export default function WorkflowPage() {
   return (
     <AppShell>
       <div style={{ height: '100%', overflowY: 'auto', padding: 24, background: 'var(--canvas)' }}>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, marginBottom: 24 }}>Workflow</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400 }}>Workflow</h1>
+          {graph && graph.nodes.length > 0 && !activeChainId && (
+            <button
+              onClick={async () => {
+                const chain = graph.nodes.map(n => n.skillName);
+                const res = await api.startChain(chain);
+                setActiveChain(chain);
+                setActiveChainId(res.chainId);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'var(--coral)', color: '#fff', border: 'none',
+                padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Play size={14} fill="currentColor" /> Run Full Chain
+            </button>
+          )}
+        </div>
+
+        {activeChainId && <ChainProgress chainId={activeChainId} chain={activeChain} />}
 
         {loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}>

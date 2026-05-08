@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { api, type Artifact, type ArtifactVersion } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import type { BadgeVariant } from '@/components/ui/Badge';
+import { Download } from 'lucide-react';
 
 interface ArtifactRailProps {
   selectedSkill?: string | null;
@@ -101,60 +102,97 @@ export default function ArtifactRail({ selectedSkill }: ArtifactRailProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
-      <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--hairline)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: 'var(--coral)' }}>/{selectedSkill}</span>
-          {verdict && <Badge variant={verdict}>{verdict}</Badge>}
-        </div>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--hairline)', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: 'var(--coral)' }}>/{selectedSkill}</span>
+            {verdict && <Badge variant={verdict}>{verdict}</Badge>}
+          </div>
 
-        {/* Version pills */}
-        {versions.length > 1 && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setActiveVersion(null)}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 9999, cursor: 'pointer',
-                background: activeVersion === null ? 'var(--coral-bg)' : 'var(--canvas)',
-                border: `1px solid ${activeVersion === null ? 'var(--coral)' : 'var(--hairline)'}`,
-                color: activeVersion === null ? 'var(--coral)' : 'var(--muted)',
-              }}
-            >
-              latest
-            </button>
-            {versions.slice(0, 4).map(v => (
+          {/* Version pills */}
+          {versions.length > 1 && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <button
-                key={v.timestamp}
-                onClick={() => setActiveVersion(v.timestamp)}
+                onClick={() => setActiveVersion(null)}
                 style={{
                   fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 9999, cursor: 'pointer',
-                  background: activeVersion === v.timestamp ? 'var(--coral-bg)' : 'var(--canvas)',
-                  border: `1px solid ${activeVersion === v.timestamp ? 'var(--coral)' : 'var(--hairline)'}`,
-                  color: activeVersion === v.timestamp ? 'var(--coral)' : 'var(--muted)',
+                  background: activeVersion === null ? 'var(--coral-bg)' : 'var(--canvas)',
+                  border: `1px solid ${activeVersion === null ? 'var(--coral)' : 'var(--hairline)'}`,
+                  color: activeVersion === null ? 'var(--coral)' : 'var(--muted)',
                 }}
               >
-                {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                latest
+              </button>
+              {versions.slice(0, 4).map(v => (
+                <button
+                  key={v.timestamp}
+                  onClick={() => setActiveVersion(v.timestamp)}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 9999, cursor: 'pointer',
+                    background: activeVersion === v.timestamp ? 'var(--coral-bg)' : 'var(--canvas)',
+                    border: `1px solid ${activeVersion === v.timestamp ? 'var(--coral)' : 'var(--hairline)'}`,
+                    color: activeVersion === v.timestamp ? 'var(--coral)' : 'var(--muted)',
+                  }}
+                >
+                  {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* View tabs */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {(['formatted', 'json'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                style={{
+                  fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: viewMode === m ? 'var(--surface-card)' : 'transparent',
+                  border: `1px solid ${viewMode === m ? 'var(--hairline)' : 'transparent'}`,
+                  color: viewMode === m ? 'var(--ink)' : 'var(--muted)',
+                  fontWeight: viewMode === m ? 500 : 400,
+                }}
+              >
+                {m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
             ))}
           </div>
-        )}
+        </div>
 
-        {/* View tabs */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-          {(['formatted', 'json'] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setViewMode(m)}
-              style={{
-                fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: 'pointer',
-                background: viewMode === m ? 'var(--surface-card)' : 'transparent',
-                border: `1px solid ${viewMode === m ? 'var(--hairline)' : 'transparent'}`,
-                color: viewMode === m ? 'var(--ink)' : 'var(--muted)',
-                fontWeight: viewMode === m ? 500 : 400,
-              }}
-            >
-              {m.charAt(0).toUpperCase() + m.slice(1)}
-            </button>
-          ))}
+        {/* Export Hub */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button 
+            onClick={() => {
+              const blob = new Blob([JSON.stringify(artifact, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${selectedSkill}-artifact.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-card)', border: '1px solid var(--hairline)', borderRadius: 6, padding: '4px 8px', fontSize: 11, color: 'var(--ink)', cursor: 'pointer' }}
+            title="Export JSON"
+          >
+            <Download size={12} /> JSON
+          </button>
+          <button 
+            onClick={() => {
+              const md = Object.entries(artifact).map(([k, v]) => `## ${k}\n\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``).join('\n\n');
+              const blob = new Blob([md], { type: 'text/markdown' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${selectedSkill}-artifact.md`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-card)', border: '1px solid var(--hairline)', borderRadius: 6, padding: '4px 8px', fontSize: 11, color: 'var(--ink)', cursor: 'pointer' }}
+            title="Export Markdown"
+          >
+            <Download size={12} /> MD
+          </button>
         </div>
       </div>
 

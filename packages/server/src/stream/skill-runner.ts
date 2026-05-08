@@ -13,6 +13,7 @@ export type RunEvent =
   | { type: 'error'; message: string; code?: string };
 
 export class SkillRunner {
+  public globalEmitter = new EventEmitter();
   private activeRuns = new Map<string, EventEmitter>();
   private childProcesses = new Map<string, ChildProcess>();
   private runLogs = new Map<string, RunEvent[]>();
@@ -90,6 +91,7 @@ export class SkillRunner {
     if (log) log.push(event);
     const emitter = this.activeRuns.get(runId);
     if (emitter) emitter.emit('event', event);
+    this.globalEmitter.emit('global_event', { runId, event });
   }
 
   respondToApproval(runId: string, decision: 'approve' | 'deny') {

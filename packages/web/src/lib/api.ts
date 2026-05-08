@@ -310,6 +310,10 @@ export const api = {
   deleteTemplate: (id: string) =>
     apiFetch<{ success: boolean }>(`/templates/${id}`, { method: 'DELETE' }),
 
+  // Chain
+  startChain: (chain: string[], inputs?: Record<string, string>) =>
+    apiFetch<{ chainId: string }>('/chain/run', { method: 'POST', body: JSON.stringify({ chain, inputs }) }),
+
   startWorkflow: (prompt: string) =>
     apiFetch<{ runId: string }>('/workflows/runs', {
       method: 'POST',
