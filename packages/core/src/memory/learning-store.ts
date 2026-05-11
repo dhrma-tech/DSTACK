@@ -45,8 +45,9 @@ export class LearningStore {
     return stored;
   }
 
-  async search(topic: string): Promise<LearningEntry[]> {
-    const needle = topic.toLowerCase();
+  async search(query: string): Promise<LearningEntry[]> {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return [];
     return (await this.all()).filter((entry) => [entry.topic, entry.insight, ...entry.appliesTo].some((value) => value.toLowerCase().includes(needle)));
   }
 

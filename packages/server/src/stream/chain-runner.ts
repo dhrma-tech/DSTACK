@@ -50,7 +50,7 @@ export class ChainRunner {
     state.emitter.emit('skill_start', { skillName: currentSkillName, index: state.currentSkillIndex });
 
     const runId = `chain-step-${Date.now()}`;
-    const skillEmitter = globalSkillRunner.startRun(runId, currentSkillName, inputs);
+    const skillEmitter = globalSkillRunner.startRun(runId, currentSkillName || '', inputs);
 
     // Pipe events to the chain emitter
     skillEmitter.on('event', (event: RunEvent) => {

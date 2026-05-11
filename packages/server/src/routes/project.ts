@@ -1,30 +1,44 @@
 import { Router, type Router as RouterType } from 'express';
-import { SafetyModeManager, DeployManager } from '@dstack/core';
+import { SafetyModeManager, DeployManager, git } from '@dstack/core';
 import type { SafetyModeName } from '@dstack/shared';
 import path from 'path';
+import fs from 'node:fs';
 
 export const projectRouter: RouterType = Router();
 
-const projectRoot = process.cwd().endsWith('server') ? 
-  path.resolve(process.cwd(), '../../') : 
-  process.cwd();
+const findProjectRoot = () => {
+  let current = __dirname;
+  while (current !== path.parse(current).root) {
+    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return process.cwd();
+};
+
+const projectRoot = findProjectRoot();
 const dstackDir = path.join(projectRoot, '.dstack');
 
 const safetyManager = new SafetyModeManager({ dstackDir });
 const deployManager = new DeployManager({ projectRoot, dstackDir });
 
 projectRouter.get('/', async (req, res) => {
-  const safetyState = await safetyManager.read();
-  const freezeState = await deployManager.readState();
+  const [safetyState, freezeState, branchInfo, headInfo] = await Promise.all([
+    safetyManager.read(),
+    deployManager.readState(),
+    git(['branch', '--show-current'], projectRoot),
+    git(['rev-parse', '--short', 'HEAD'], projectRoot)
+  ]);
   
   res.json({
     name: 'DStack',
-    branch: 'main',
-    head: '492f696',
+    branch: branchInfo.stdout.trim() || 'main',
+    head: headInfo.stdout.trim() || 'unknown',
     stage: 'planning',
     safetyMode: safetyState.mode,
     freezeState: freezeState.frozen,
-    providerMode: 'FAKE'
+    providerMode: (process.env.DSTACK_PROVIDER || 'gemini').toUpperCase()
   });
 });
 

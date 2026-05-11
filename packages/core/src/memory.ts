@@ -68,6 +68,12 @@ export class ArtifactStore {
     const content = await readJsonFile<JsonObject>(filePath);
     return { id: "latest", skillName, createdAt: stringValue(content.generatedAt, nowIso()), filePath, isLatest: true, content, verdict: extractVerdict(content) };
   }
+  async read(skillName: string, id: string): Promise<Artifact | null> {
+    const filePath = path.join(this.artifactRoot, skillName, id.endsWith(".json") ? id : `${id}.json`);
+    if (!(await exists(filePath))) return null;
+    const content = await readJsonFile<JsonObject>(filePath);
+    return { id: id.replace(/\.json$/, ""), skillName, createdAt: stringValue(content.generatedAt, nowIso()), filePath, isLatest: id === "latest", content, verdict: extractVerdict(content) };
+  }
   async requireLatest(skillName: string): Promise<Artifact> {
     const artifact = await this.readLatest(skillName);
     if (!artifact) throw new ArtifactError(`Missing required artifact: ${skillName}`, { skillName });

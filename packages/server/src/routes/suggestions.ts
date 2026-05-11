@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { ArtifactStore, ConflictScanner } from '@dstack/core';
+import { ConflictScanner } from '@dstack/core';
+// ConflictScanner requires the advanced ArtifactStore from core/artifacts/store
+import { ArtifactStore } from '../../../../packages/core/src/artifacts/store.js';
 import path from 'path';
+import fs from 'node:fs';
 
 const router = Router();
 
@@ -49,7 +52,10 @@ router.get('/suggestions', (_req: Request, res: Response) => {
 // GET /api/workflow/conflicts — cross-skill conflict detection
 router.get('/conflicts', async (_req: Request, res: Response) => {
   try {
-    const store = new ArtifactStore(getDStackDir());
+    const store = new ArtifactStore({ 
+      dstackDir: getDStackDir(),
+      projectRoot: process.cwd() 
+    });
     const scanner = new ConflictScanner(store);
     
     // In real impl, we fetch the real graph, but for demo we pass a mock one 
