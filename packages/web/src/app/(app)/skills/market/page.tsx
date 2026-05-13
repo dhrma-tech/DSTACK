@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { api, type MarketSkill } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
-import { ShoppingBag, Download, Star, Users, Search, Filter, Globe, Shield } from 'lucide-react';
+import { Download, Star, Users, Search, Filter, Globe, Shield } from 'lucide-react';
 
 export default function SkillMarketPage() {
   const [skills, setSkills] = useState<MarketSkill[]>([]);
