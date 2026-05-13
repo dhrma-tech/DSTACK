@@ -6,11 +6,11 @@ import { api, type BenchmarkRun } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, AreaChart, Area, Cell 
+  AreaChart, Area, Cell 
 } from 'recharts';
 import { 
-  BarChart3, Clock, Zap, Target, TrendingUp, Activity, 
-  ChevronRight, Calendar, Layers, ShieldCheck 
+  BarChart3, Clock, Target, TrendingUp, Activity, 
+  Calendar, Layers, ShieldCheck 
 } from 'lucide-react';
 
 export default function BenchmarksPage() {
