@@ -4,7 +4,7 @@ import { ConflictScanner } from '@dstack/core';
 // ConflictScanner requires the advanced ArtifactStore from core/artifacts/store
 import { ArtifactStore } from '../../../../packages/core/src/artifacts/store.js';
 import path from 'path';
-import fs from 'node:fs';
+
 
 const router = Router();
 
