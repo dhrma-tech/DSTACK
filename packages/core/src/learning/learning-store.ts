@@ -1,4 +1,4 @@
-import fs from 'node:fs/promises';
+
 import path from 'node:path';
 import { exists, readJsonFile, atomicWrite, nowIso } from '../utils.js';
 
