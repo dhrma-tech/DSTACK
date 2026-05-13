@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { api, type ShellEvent } from '@/lib/api';
-import { Play, Plus, X, Terminal as TerminalIcon, Cpu, Zap, Activity } from 'lucide-react';
+import { Play, Plus, X, Cpu, Activity } from 'lucide-react';
 
 interface AgentTerminal {
   id: string;
@@ -38,12 +38,12 @@ export default function PlaygroundPage() {
 
     try {
       const { runId } = await api.runSkill(agent.skillName);
-      const stopStream = api.streamRun(runId, (event) => {
+      api.streamRun(runId, (event) => {
         setAgents(prev => prev.map(a => a.id === id ? { ...a, events: [...a.events, event] } : a));
       }, () => {
         setAgents(prev => prev.map(a => a.id === id ? { ...a, status: 'complete' } : a));
       });
-    } catch (err) {
+    } catch (_err) {
       setAgents(prev => prev.map(a => a.id === id ? { ...a, status: 'error' } : a));
     }
   };
