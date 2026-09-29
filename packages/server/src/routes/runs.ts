@@ -1,157 +1,137 @@
-import { Router } from 'express';
-import { globalSkillRunner } from '../stream/skill-runner';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { Router, type Response } from 'express';
+import { getDstackDir } from '../context';
+import { asyncRoute, HttpError, openSse, rateLimit, writeSse } from '../lib/http';
+import { listRunRecords, readRunRecord, RUN_ID_PATTERN } from '../lib/run-records';
+import { newRunId, parseInputs, parseRunRequest, resolveSkillName } from '../lib/run-request';
 import { globalChainRunner } from '../stream/chain-runner';
+import { globalSkillRunner, type RunEvent } from '../stream/skill-runner';
 
 export const runsRouter = Router();
 
-// Endpoint bound in `index.ts` via `app.use('/api/runs', runsRouter)`
-// But wait, the POST is to /api/skills/:skillName/run, so maybe that should be in skillsRouter.
-// I'll export a function to attach the skills run route to the skills router.
+function requireRunId(raw: unknown): string {
+  const runId = String(raw);
+  if (!RUN_ID_PATTERN.test(runId)) throw new HttpError(404, 'Run not found', 'NOT_FOUND');
+  return runId;
+}
 
-export const attachRunRoutes = (app: import('express').Express) => {
-  app.get('/api/runs', async (req, res) => {
+// Runs started from the CLI only leave a session log, not a run record.
+async function listCliSessionLogs(limit: number) {
+  const logsDir = path.join(getDstackDir(), 'logs');
+  let files: string[];
+  try {
+    files = (await readdir(logsDir)).filter((file) => file.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  const entries = await Promise.all(files.slice(-limit * 2).map(async (file) => {
     try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      
-      const projectRoot = process.cwd().endsWith('server') ? 
-        path.resolve(process.cwd(), '../../') : 
-        process.cwd();
-      const logsDir = path.join(projectRoot, '.dstack', 'logs');
-      
-      try {
-        await fs.access(logsDir);
-      } catch {
-        return res.json([]);
-      }
-      
-      const files = await fs.readdir(logsDir);
-      const runs = await Promise.all(
-        files.filter(f => f.endsWith('.json')).map(async (file) => {
-          const content = await fs.readFile(path.join(logsDir, file), 'utf-8');
-          try {
-            const parsed = JSON.parse(content);
-            return {
-              id: file.replace('.json', ''),
-              command: parsed.skillName,
-              provider: parsed.provider || 'gemini',
-              fakeMode: parsed.provider === 'fake',
-              status: parsed.status,
-              verdict: parsed.error ? 'FAIL' : 'PASS', // Basic inference
-              duration: parsed.completedAt ? `${Math.round((new Date(parsed.completedAt).getTime() - new Date(parsed.startedAt).getTime()) / 1000)}s` : 'running',
-              requestedAt: parsed.startedAt
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-      
-      const presentRuns = runs.filter((run): run is NonNullable<typeof run> => run !== null);
-      res.json(presentRuns.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
-    } catch (err) {
-      console.error('Failed to list runs:', err);
-      res.status(500).json({ error: 'Failed to list runs' });
+      const parsed = JSON.parse(await readFile(path.join(logsDir, file), 'utf-8')) as { skillName?: string; startedAt?: string; completedAt?: string; provider?: string; status?: string };
+      if (!parsed.skillName || !parsed.startedAt) return null;
+      return {
+        id: file.slice(0, -5), skillName: parsed.skillName, status: parsed.status ?? 'complete', startedAt: parsed.startedAt,
+        completedAt: parsed.completedAt ?? null, verdict: null, provider: parsed.provider ?? 'gemini', toolCallCount: 0,
+        durationMs: parsed.completedAt ? Date.parse(parsed.completedAt) - Date.parse(parsed.startedAt) : null, source: 'cli' as const
+      };
+    } catch {
+      return null;
     }
+  }));
+  return entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+}
+
+runsRouter.get('/runs', asyncRoute(async (req, res) => {
+  const limit = Math.min(Number.parseInt(String(req.query.limit ?? '50'), 10) || 50, 200);
+  const [records, cliRuns] = await Promise.all([listRunRecords(limit), listCliSessionLogs(limit)]);
+  const merged = [...records.map((record) => ({ ...record, source: 'web' as const })), ...cliRuns];
+  res.json(merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, limit));
+}));
+
+runsRouter.get('/runs/:runId', asyncRoute(async (req, res) => {
+  const runId = requireRunId(req.params.runId);
+  const record = await readRunRecord(runId);
+  if (!record) throw new HttpError(404, 'Run not found', 'NOT_FOUND');
+  res.json({ ...record, active: globalSkillRunner.isActive(runId) });
+}));
+
+runsRouter.post('/runs/:runId/stop', asyncRoute(async (req, res) => {
+  const runId = requireRunId(req.params.runId);
+  if (!globalSkillRunner.stopRun(runId)) throw new HttpError(409, 'Run is not active', 'NOT_ACTIVE');
+  res.json({ stopped: true });
+}));
+
+runsRouter.post('/skills/:skillName/run', rateLimit(30), asyncRoute(async (req, res) => {
+  const skillName = await resolveSkillName(req.params.skillName);
+  const request = parseRunRequest(req.body);
+  const runId = newRunId();
+  globalSkillRunner.startRun(runId, skillName, request);
+  res.json({ runId });
+}));
+
+async function replayStored(runId: string, res: Response): Promise<void> {
+  const record = await readRunRecord(runId);
+  if (!record) throw new HttpError(404, 'Run not found', 'NOT_FOUND');
+  openSse(res);
+  for (const event of record.events) writeSse(res, event);
+  res.end();
+}
+
+runsRouter.get('/runs/:runId/stream', asyncRoute(async (req, res) => {
+  const runId = requireRunId(req.params.runId);
+  const emitter = globalSkillRunner.getEmitter(runId);
+  if (!emitter) return replayStored(runId, res);
+
+  openSse(res);
+  const log = globalSkillRunner.getLog(runId);
+  for (const event of log) writeSse(res, event);
+  if (log.at(-1)?.type === 'complete') {
+    res.end();
+    return;
+  }
+  const listener = (event: RunEvent) => {
+    writeSse(res, event);
+    if (event.type === 'complete') res.end();
+  };
+  emitter.on('event', listener);
+  req.on('close', () => emitter.off('event', listener));
+}));
+
+runsRouter.post('/approvals/:runId/respond', asyncRoute(async (req, res) => {
+  const runId = requireRunId(req.params.runId);
+  const { decision } = (req.body ?? {}) as { decision?: unknown };
+  if (decision !== 'approve' && decision !== 'deny') throw new HttpError(400, 'decision must be "approve" or "deny"', 'VALIDATION');
+  if (!globalSkillRunner.respondToApproval(runId, decision)) throw new HttpError(409, 'Run is not waiting for approval', 'NOT_ACTIVE');
+  res.json({ written: true });
+}));
+
+runsRouter.post('/chain/run', rateLimit(10), asyncRoute(async (req, res) => {
+  const { chain, inputs } = (req.body ?? {}) as { chain?: unknown; inputs?: unknown };
+  if (!Array.isArray(chain) || chain.length === 0 || chain.length > 20) throw new HttpError(400, 'chain must be a list of 1–20 skill names', 'VALIDATION');
+  const skills = await Promise.all(chain.map(resolveSkillName));
+  const chainId = globalChainRunner.startChain(skills, parseInputs(inputs));
+  res.json({ chainId });
+}));
+
+runsRouter.get('/chain/:chainId/stream', (req, res) => {
+  const chainState = globalChainRunner.getChain(String(req.params.chainId));
+  if (!chainState) {
+    res.status(404).json({ error: 'Chain not found', code: 'NOT_FOUND' });
+    return;
+  }
+  openSse(res);
+  const onStart = (data: object) => writeSse(res, { type: 'skill_start', ...data });
+  const onEvent = (data: object) => writeSse(res, { type: 'skill_event', ...data });
+  const onComplete = (data: object) => {
+    writeSse(res, { type: 'chain_complete', ...data });
+    res.end();
+  };
+  chainState.emitter.on('skill_start', onStart);
+  chainState.emitter.on('skill_event', onEvent);
+  chainState.emitter.on('chain_complete', onComplete);
+  req.on('close', () => {
+    chainState.emitter.off('skill_start', onStart);
+    chainState.emitter.off('skill_event', onEvent);
+    chainState.emitter.off('chain_complete', onComplete);
   });
-
-  app.post('/api/skills/:skillName/run', (req, res) => {
-    const { skillName } = req.params;
-    const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    
-    globalSkillRunner.startRun(runId, skillName, req.body || {});
-    
-    res.json({ runId });
-  });
-
-  app.get('/api/runs/:runId/stream', (req, res) => {
-    const { runId } = req.params;
-    
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    
-    // Send existing log
-    const log = globalSkillRunner.getLog(runId);
-    for (const event of log) {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
-    }
-
-    const emitter = globalSkillRunner.getEmitter(runId);
-    if (!emitter) {
-      const lastEvent = log.at(-1);
-      if (lastEvent?.type === 'complete') {
-        // Run is already finished and emitter cleaned up
-        res.end();
-      } else {
-        // Run not found
-        res.status(404).end();
-      }
-      return;
-    }
-
-    const listener = (event: import('../stream/skill-runner').RunEvent) => {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
-      if (event.type === 'complete') {
-        res.end();
-      }
-    };
-
-    emitter.on('event', listener);
-
-    req.on('close', () => {
-      emitter.off('event', listener);
-    });
-  });
-
-  app.post('/api/approvals/:runId/respond', (req, res) => {
-    const { runId } = req.params;
-    const { decision } = req.body;
-    
-    if (decision !== 'approve' && decision !== 'deny') {
-      return res.status(400).json({ error: 'Invalid decision. Must be "approve" or "deny"' });
-    }
-
-    globalSkillRunner.respondToApproval(runId, decision);
-    res.json({ success: true });
-  });
-
-  app.post('/api/chain/run', (req, res) => {
-    const { chain, inputs } = req.body;
-    if (!Array.isArray(chain)) {
-      return res.status(400).json({ error: 'chain must be an array of skill names' });
-    }
-    const chainId = globalChainRunner.startChain(chain, inputs || {});
-    res.json({ chainId });
-  });
-
-  app.get('/api/chain/:chainId/stream', (req, res) => {
-    const { chainId } = req.params;
-    const chainState = globalChainRunner.getChain(chainId);
-    
-    if (!chainState) {
-      return res.status(404).end();
-    }
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    const skillStartListener = (data: any) => res.write(`data: ${JSON.stringify({ type: 'skill_start', ...data })}\n\n`);
-    const skillEventListener = (data: any) => res.write(`data: ${JSON.stringify({ type: 'skill_event', ...data })}\n\n`);
-    const chainCompleteListener = (data: any) => {
-      res.write(`data: ${JSON.stringify({ type: 'chain_complete', ...data })}\n\n`);
-      res.end();
-    };
-
-    chainState.emitter.on('skill_start', skillStartListener);
-    chainState.emitter.on('skill_event', skillEventListener);
-    chainState.emitter.on('chain_complete', chainCompleteListener);
-
-    req.on('close', () => {
-      chainState.emitter.off('skill_start', skillStartListener);
-      chainState.emitter.off('skill_event', skillEventListener);
-      chainState.emitter.off('chain_complete', chainCompleteListener);
-    });
-  });
-};
+});

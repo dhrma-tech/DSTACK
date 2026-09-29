@@ -2,10 +2,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { api, type ShellEvent } from '../lib/api';
+import { api, API_BASE, type ShellEvent } from '../lib/api';
 import { useSSE } from './useSSE';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
 
 export function useActiveRun() {
   const [runId, setRunId] = useState<string | null>(null);

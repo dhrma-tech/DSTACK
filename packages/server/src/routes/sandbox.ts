@@ -1,6 +1,7 @@
 import path from "node:path";
 import { Router, type Express, type Request, type Response } from "express";
 import { LocalSandboxProvider, StateDesyncError } from "@dstack/core";
+import { getDstackDir } from '../context';
 
 interface SandboxFilesBody {
   files?: unknown;
@@ -11,8 +12,7 @@ interface SandboxCommandBody {
 }
 
 function sandboxRoot(): string {
-  const projectRoot = process.cwd().endsWith("server") ? path.resolve(process.cwd(), "../../") : process.cwd();
-  return path.join(projectRoot, ".dstack", "api-sandbox");
+  return path.join(getDstackDir(), "api-sandbox");
 }
 
 export const sandboxRouter = Router();

@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect, useCallback } from 'react';
-import { api, type SkillSummary } from '../lib/api';
+import { api, API_BASE, type SkillSummary } from '../lib/api';
 
 export function useSkills() {
   const [skills, setSkills] = useState<SkillSummary[]>([]);
@@ -29,7 +29,6 @@ export function useSkills() {
 
   // Subscribe to skill-status-changed SSE events
   useEffect(() => {
-    const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
     const es = new EventSource(`${API_BASE}/events`);
     es.onmessage = (e) => {
       try {

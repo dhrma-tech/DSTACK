@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { getDstackDir } from '../context';
 
 const router = Router();
 
@@ -25,10 +26,7 @@ interface HistoryStore {
 }
 
 function getHistoryPath(): string {
-  const projectRoot = process.cwd().endsWith('server')
-    ? path.resolve(process.cwd(), '../../')
-    : process.cwd();
-  return path.join(projectRoot, '.dstack', 'history.json');
+  return path.join(getDstackDir(), 'history.json');
 }
 
 function readHistory(): HistoryStore {

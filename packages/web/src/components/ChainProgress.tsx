@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Check, Circle, Play, XCircle } from 'lucide-react';
+import { API_BASE } from '@/lib/api';
 
 interface ChainProgressProps {
   chainId: string;
@@ -13,7 +14,7 @@ export default function ChainProgress({ chainId, chain }: ChainProgressProps) {
   const [status, setStatus] = useState<'running' | 'complete' | 'error'>('running');
 
   useEffect(() => {
-    const es = new EventSource(`http://localhost:3001/api/chain/${chainId}/stream`);
+    const es = new EventSource(`${API_BASE}/chain/${encodeURIComponent(chainId)}/stream`);
     
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);

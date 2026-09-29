@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { getDstackDir } from '../context';
 
 const router = Router();
 
@@ -20,10 +21,7 @@ interface TemplateStore {
 }
 
 function getTemplatePath(): string {
-  const projectRoot = process.cwd().endsWith('server')
-    ? path.resolve(process.cwd(), '../../')
-    : process.cwd();
-  return path.join(projectRoot, '.dstack', 'templates.json');
+  return path.join(getDstackDir(), 'templates.json');
 }
 
 function readTemplates(): TemplateStore {

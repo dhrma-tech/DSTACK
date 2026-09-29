@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { LearningEntry } from "@dstack/shared";
+import type { LearningEntry, LearningStatus } from "@dstack/shared";
 import { atomicWrite, exists, nowIso, readJsonFile, shortHash } from "../utils.js";
 
 export interface LearningStoreOptions {
@@ -37,7 +37,8 @@ export class LearningStore {
       source: entry.source,
       createdAt,
       projectId: entry.projectId ?? this.projectId,
-      usedInSkillRuns: entry.usedInSkillRuns ?? []
+      usedInSkillRuns: entry.usedInSkillRuns ?? [],
+      ...(entry.status ? { status: entry.status } : {})
     };
     const entries = await this.all();
     entries.push(stored);
@@ -55,6 +56,23 @@ export class LearningStore {
     const entries = await this.all();
     if (!tag) return entries;
     return entries.filter((entry) => entry.appliesTo.includes(tag) || entry.topic === tag);
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const entries = await this.all();
+    const retained = entries.filter((entry) => entry.id !== id);
+    if (retained.length === entries.length) return false;
+    await this.writeAll(retained);
+    return true;
+  }
+
+  async setStatus(id: string, status: LearningStatus): Promise<LearningEntry | null> {
+    const entries = await this.all();
+    const entry = entries.find((item) => item.id === id);
+    if (!entry) return null;
+    entry.status = status;
+    await this.writeAll(entries);
+    return entry;
   }
 
   async prune(olderThan: Date): Promise<number> {

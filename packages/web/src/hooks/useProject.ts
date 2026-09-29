@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect, useCallback } from 'react';
-import { api, type ProjectState, type HealthReport } from '../lib/api';
+import { api, API_BASE, type ProjectState, type HealthReport } from '../lib/api';
 
 export function useProject() {
   const [project, setProject] = useState<ProjectState | null>(null);
@@ -32,7 +32,6 @@ export function useProject() {
 
   // Subscribe to global SSE events for live updates
   useEffect(() => {
-    const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
     const es = new EventSource(`${API_BASE}/events`);
     es.onmessage = (e) => {
       try {

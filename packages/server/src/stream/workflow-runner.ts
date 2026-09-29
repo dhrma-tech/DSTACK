@@ -8,6 +8,7 @@ import {
   type SandboxProvider
 } from "@dstack/core";
 import type { AgentEvent, AgentPersona, ApprovalGate, CodePatch, JsonObject, WorkflowTransition } from "@dstack/shared";
+import { getProjectRoot } from '../context';
 
 interface WorkflowRunState {
   id: string;
@@ -31,7 +32,7 @@ export class WorkflowRunner {
 
   start(input: StartWorkflowRunInput): WorkflowRunState {
     const runId = `wf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const projectRoot = process.cwd().endsWith("server") ? path.resolve(process.cwd(), "../../") : process.cwd();
+    const projectRoot = getProjectRoot();
     const sandboxRoot = path.join(projectRoot, ".dstack", "web-workflow-sandbox", runId);
     const state: WorkflowRunState = {
       id: runId,

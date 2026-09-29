@@ -174,13 +174,13 @@ proModel: fake-pro-model
       invocation: null,
       serveOptions: {
         host: "127.0.0.1",
-        port: 4574, // Use different port to avoid conflicts
+        port: 0, // Let the OS pick a free port
         tokenFile: ".dstack/api/token"
       }
     };
 
     const result = await route(command);
-    
+    try {
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
     
@@ -210,7 +210,13 @@ proModel: fake-pro-model
     // Validate warnings contain localhost warning
     expect(Array.isArray(parsed.warnings)).toBe(true);
     expect(parsed.warnings.some(w => w.code === "LOCALHOST_ONLY")).toBe(true);
-  });
+    expect(parsed.data.port).toBeGreaterThan(0);
+    const health = await fetch(`${parsed.data.serverUrl}/health`);
+    expect(health.status).toBe(200);
+    } finally {
+      await result.dispose?.();
+    }
+  }, 90_000);
 
   it("stdout contains valid JSON only", async () => {
     const command: ParsedCommand = {

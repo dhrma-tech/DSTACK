@@ -1,32 +1,19 @@
 import { Router, type Router as RouterType } from 'express';
 import { SafetyModeManager, DeployManager, git } from '@dstack/core';
 import type { SafetyModeName } from '@dstack/shared';
-import path from 'path';
-import fs from 'node:fs';
+import { getDstackDir, getProjectRoot } from '../context';
 
 export const projectRouter: RouterType = Router();
 
-const findProjectRoot = () => {
-  let current = __dirname;
-  while (current !== path.parse(current).root) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return process.cwd();
-};
-
-const projectRoot = findProjectRoot();
-const dstackDir = path.join(projectRoot, '.dstack');
-
-const safetyManager = new SafetyModeManager({ dstackDir });
-const deployManager = new DeployManager({ projectRoot, dstackDir });
+const SAFETY_MODES: readonly SafetyModeName[] = ['NORMAL', 'CAREFUL', 'GUARD'];
+const safety = () => new SafetyModeManager({ dstackDir: getDstackDir() });
+const deploy = () => new DeployManager({ projectRoot: getProjectRoot(), dstackDir: getDstackDir() });
 
 projectRouter.get('/', async (req, res) => {
+  const projectRoot = getProjectRoot();
   const [safetyState, freezeState, branchInfo, headInfo] = await Promise.all([
-    safetyManager.read(),
-    deployManager.readState(),
+    safety().read(),
+    deploy().readState(),
     git(['branch', '--show-current'], projectRoot),
     git(['rev-parse', '--short', 'HEAD'], projectRoot)
   ]);
@@ -46,15 +33,19 @@ projectRouter.post('/settings', async (req, res) => {
   const { safetyMode, freezeState } = req.body as { safetyMode?: string; freezeState?: boolean };
 
   try {
+    if (safetyMode !== undefined && !SAFETY_MODES.includes(safetyMode as SafetyModeName)) {
+      res.status(400).json({ error: 'safetyMode must be NORMAL, CAREFUL or GUARD', code: 'VALIDATION' });
+      return;
+    }
     if (safetyMode) {
-      await safetyManager.setMode(safetyMode as SafetyModeName, null, `Manually set from UI to ${safetyMode}`);
+      await safety().setMode(safetyMode as SafetyModeName, null, `Manually set from UI to ${safetyMode}`);
     }
 
     if (freezeState !== undefined) {
       if (freezeState) {
-        await deployManager.freeze('Manually frozen from UI', null, null, 'dstack-ui');
+        await deploy().freeze('Manually frozen from UI', null, null, 'dstack-ui');
       } else {
-        await deployManager.unfreeze();
+        await deploy().unfreeze();
       }
     }
 

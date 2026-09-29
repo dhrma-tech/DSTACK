@@ -308,7 +308,11 @@ export interface LearningEntry {
   createdAt: string;
   projectId: string;
   usedInSkillRuns: string[];
+  /** Review state from the Learning Center. Absent means pending. */
+  status?: LearningStatus;
 }
+
+export type LearningStatus = "pending" | "approved" | "rejected";
 
 export interface BenchmarkRun {
   id: string;

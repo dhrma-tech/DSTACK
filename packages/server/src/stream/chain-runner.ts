@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { newRunId } from '../lib/run-request';
 import { globalSkillRunner } from './skill-runner';
 import type { RunEvent } from './skill-runner';
 
@@ -49,20 +50,21 @@ export class ChainRunner {
     const currentSkillName = state.chain[state.currentSkillIndex];
     state.emitter.emit('skill_start', { skillName: currentSkillName, index: state.currentSkillIndex });
 
-    const runId = `chain-step-${Date.now()}`;
-    const skillEmitter = globalSkillRunner.startRun(runId, currentSkillName || '', inputs);
+    const runId = newRunId();
+    const skillEmitter = globalSkillRunner.startRun(runId, currentSkillName || '', { inputs, flags: {} });
+    state.emitter.emit('skill_run', { skillName: currentSkillName, runId });
 
     // Pipe events to the chain emitter
     skillEmitter.on('event', (event: RunEvent) => {
       state.emitter.emit('skill_event', { skillName: currentSkillName, event });
     });
 
-    // Wait for completion
+    // Only the final `complete` event ends a step; stderr `error` events are informational.
     await new Promise<void>((resolve) => {
       const completionListener = (event: RunEvent) => {
-        if (event.type === 'complete' || event.type === 'error') {
+        if (event.type === 'complete') {
           skillEmitter.off('event', completionListener);
-          if (event.type === 'error' || (event.type === 'complete' && event.status === 'error')) {
+          if (event.status !== 'complete') {
             state.status = 'error';
             state.emitter.emit('chain_complete', { status: 'error', failedSkill: currentSkillName });
             resolve();

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
 import { ConfigError, dstackConfigSchema, type DStackConfig } from "@dstack/shared";
@@ -53,7 +53,27 @@ export class ConfigManager {
     if (!parsed.success) throw new ConfigError("Invalid DStack configuration", { issues: parsed.error.issues });
     return Object.freeze(parsed.data) as DStackConfig;
   }
+
+  /** Merge non-secret settings into .dstack/config.yaml. Secrets are never written here. */
+  static async updateFile(projectRoot: string, patch: ConfigFileUpdate): Promise<DStackConfig> {
+    const base = defaultConfig(path.resolve(projectRoot));
+    const configPath = path.join(base.dstackDir, "config.yaml");
+    const current = await readConfigFile(configPath);
+    const next: ConfigFile = { ...current };
+    for (const key of UPDATABLE_KEYS) {
+      const value = patch[key];
+      if (value !== undefined) (next as Record<string, unknown>)[key] = value;
+    }
+    const check = dstackConfigSchema.safeParse({ ...base, ...next, geminiApiKey: null });
+    if (!check.success) throw new ConfigError("Invalid settings", { issues: check.error.issues });
+    await mkdir(base.dstackDir, { recursive: true });
+    await writeFile(configPath, yaml.dump(next), "utf8");
+    return ConfigManager.load({ projectRoot });
+  }
 }
+
+const UPDATABLE_KEYS = ["provider", "defaultModel", "proModel", "maxTokens", "requestTimeoutMs", "maxRetries", "browserHeadless"] as const;
+export type ConfigFileUpdate = Partial<Pick<DStackConfig, (typeof UPDATABLE_KEYS)[number]>>;
 
 function readProviderEnv(): DStackConfig["provider"] | undefined {
   const value = process.env.DSTACK_PROVIDER;

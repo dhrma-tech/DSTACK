@@ -1,8 +1,18 @@
 import { ConfigManager, DeployManager, SafetyModeManager, SkillAuditor, SkillExecutor, shortHash } from "@dstack/core";
 import type { ParsedCommand } from "./parser.js";
+import { startServeProcess } from "./serve.js";
 import { helpText, resultText, skillCheckText, skillsText, versionText, type RuntimeStatus, skillsJson, skillCheckJson, resultJson } from "./printer.js";
 
-export async function route(command: ParsedCommand): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+export interface RouteResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  /** Long-running commands (serve) resolve this when they finish. */
+  keepAlive?: Promise<void>;
+  dispose?: () => Promise<void>;
+}
+
+export async function route(command: ParsedCommand): Promise<RouteResult> {
   if (command.help) return { stdout: helpText(), stderr: "", exitCode: 0 };
   if (command.version) return { stdout: versionText("0.1.0"), stderr: "", exitCode: 0 };
   
@@ -84,27 +94,26 @@ export async function route(command: ParsedCommand): Promise<{ stdout: string; s
   }
 }
 
-async function handleServeCommand(_command: ParsedCommand, projectRoot: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function handleServeCommand(command: ParsedCommand, projectRoot: string): Promise<RouteResult> {
   try {
-    const { spawn } = await import('child_process');
-    
-    console.log("🚀 Starting DStack Bridge Server...");
-    
-    const child = spawn('pnpm', ['--filter', '@dstack/server', 'dev'], {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      shell: true
+    const server = await startServeProcess({
+      projectRoot,
+      ...(command.serveOptions?.host !== undefined ? { host: command.serveOptions.host } : {}),
+      ...(command.serveOptions?.port !== undefined ? { port: command.serveOptions.port } : {}),
+      ...(command.serveOptions?.tokenFile !== undefined ? { tokenFile: command.serveOptions.tokenFile } : {})
     });
-
-    return new Promise((resolve) => {
-      child.on('close', (code) => {
-        resolve({ stdout: `Server stopped with code ${code}`, stderr: "", exitCode: code ?? 0 });
-      });
-      
-      child.on('error', (err) => {
-        resolve({ stdout: "", stderr: `Failed to start server: ${err.message}`, exitCode: 1 });
-      });
-    });
+    const message = `DStack server listening at ${server.url}. API token: ${server.tokenFile}`;
+    const keepAlive = server.exited.then(() => undefined);
+    if (!command.json) return { stdout: message, stderr: "", exitCode: 0, keepAlive, dispose: server.stop };
+    const requestId = `serve-${Date.now()}`;
+    const envelope = {
+      ok: true,
+      data: { serverUrl: server.url, host: server.host, port: server.port, tokenFile: server.tokenFile, message },
+      warnings: [{ code: "LOCALHOST_ONLY", message: "The server only accepts requests addressed to localhost." }],
+      error: null,
+      meta: { requestId, timestamp: new Date().toISOString(), apiVersion: "v1", command: "serve", projectId: shortHash(projectRoot, 12) }
+    };
+    return { stdout: JSON.stringify(envelope), stderr: "", exitCode: 0, keepAlive, dispose: server.stop };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error starting server";
     return { stdout: "", stderr: `Failed to start server: ${errorMessage}`, exitCode: 1 };

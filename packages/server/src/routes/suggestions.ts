@@ -4,11 +4,12 @@ import { ConflictScanner } from '@dstack/core';
 // ConflictScanner requires the advanced ArtifactStore from core/artifacts/store
 import { ArtifactStore } from '../../../../packages/core/src/artifacts/store.js';
 import path from 'path';
+import { getDstackDir, getProjectRoot } from '../context';
 
 
 const router = Router();
 
-const getDStackDir = () => path.join(process.cwd(), '.dstack');
+const getDStackDir = getDstackDir;
 
 interface Suggestion {
   skill: string;
@@ -54,7 +55,7 @@ router.get('/conflicts', async (_req: Request, res: Response) => {
   try {
     const store = new ArtifactStore({ 
       dstackDir: getDStackDir(),
-      projectRoot: process.cwd() 
+      projectRoot: getProjectRoot() 
     });
     const scanner = new ConflictScanner(store);
     

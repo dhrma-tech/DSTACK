@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, type WorkflowGraph } from '@/lib/api';
+import { api, API_BASE, type WorkflowGraph } from '@/lib/api';
 
 interface WorkflowRailProps {
   onSelectSkill?: (skillName: string) => void;
@@ -37,7 +37,6 @@ export default function WorkflowRail({ onSelectSkill }: WorkflowRailProps) {
 
   // Refresh on SSE events
   useEffect(() => {
-    const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
     const es = new EventSource(`${API_BASE}/events`);
     es.onmessage = (e) => {
       try {

@@ -1,7 +1,8 @@
 import type { AgentEvent } from '@dstack/shared';
 
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
+// Same-origin proxy (app/api/dstack) that adds the server's API token.
+export const API_BASE = '/api/dstack';
 
 // ── Error type ──────────────────────────────────────────────────────────────
 
@@ -385,7 +386,8 @@ export const api = {
     apiFetch<SafetyModeState>('/safety/mode', { method: 'POST', body: JSON.stringify({ mode }) }),
 
   // Learnings
-  getLearnings: (query?: string) => apiFetch<LearningEntry[]>('/learnings'),
+  getLearnings: (query?: string) =>
+    apiFetch<LearningEntry[]>(`/learnings${query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`),
   updateLearningStatus: (id: string, status: 'approved' | 'rejected') =>
     apiFetch<{ success: boolean }>(`/learnings/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
   extractLearning: (data: { runId: string, skillName: string, pattern: string, context: string }) =>

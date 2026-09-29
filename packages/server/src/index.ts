@@ -1,89 +1,33 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { projectRouter } from './routes/project';
-import { skillsRouter } from './routes/skills';
-import { artifactsRouter } from './routes/artifacts';
-import { attachRunRoutes } from './routes/runs';
-import { attachSandboxRoutes } from './routes/sandbox';
-import { attachWorkflowRoutes } from './routes/workflows';
-import { historyRouter } from './routes/history';
-import { suggestionsRouter } from './routes/suggestions';
-import { templatesRouter } from './routes/templates';
-import { learningsRouter } from './routes/learnings';
-import notifier from 'node-notifier';
-import { globalSkillRunner } from './stream/skill-runner';
+import { startServer } from './server';
 
-const app = express();
-const port = process.env.PORT || 3001;
+export { createApp } from './app';
+export { startServer } from './server';
+export type { RunningServer, StartServerOptions } from './server';
 
-app.use(helmet());
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.json());
+// Printed when DSTACK_READY_SIGNAL is set so a parent process (the `ds --serve` CLI) knows the real port.
+export const READY_PREFIX = 'DSTACK_READY ';
 
-// API Routes
-app.use('/api/project', projectRouter);
-app.use('/api/skills', skillsRouter);
-app.use('/api/artifacts', artifactsRouter);
-app.use('/api/history', historyRouter);
-app.use('/api/workflow', suggestionsRouter);
-app.use('/api/templates', templatesRouter);
-app.use('/api/learnings', learningsRouter);
-
-app.get('/api/workflow/graph', (req, res) => {
-  res.json({
-    nodes: [
-      { id: 'office-hours', skillName: 'office-hours', label: 'Office Hours', phase: 'Planning', status: 'ready', verdict: null, timestamp: null, isStale: false },
-    ],
-    edges: []
-  });
-});
-
-app.get('/api/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
-  const interval = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
-  }, 30000);
-  req.on('close', () => clearInterval(interval));
-});
-
-attachRunRoutes(app);
-attachWorkflowRoutes(app);
-attachSandboxRoutes(app);
-
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// Notifications
-globalSkillRunner.globalEmitter.on('global_event', ({ event }) => {
-  if (event.type === 'complete') {
-    notifier.notify({
-      title: 'DStack Skill Run',
-      message: `/${event.skillName} finished with status: ${event.status}`,
-      sound: true,
-      wait: false
+// Run directly (`pnpm server`, `ds --serve`) rather than imported by tests.
+if (require.main === module) {
+  const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '3001', 10);
+  startServer({
+    port,
+    host: process.env.API_HOST ?? '127.0.0.1',
+    ...(process.env.DSTACK_TOKEN_FILE ? { tokenFile: process.env.DSTACK_TOKEN_FILE } : {})
+  })
+    .then((server) => {
+      if (process.env.DSTACK_READY_SIGNAL) {
+        console.log(READY_PREFIX + JSON.stringify({ url: server.url, host: server.host, port: server.port, tokenFile: server.tokenFileRelative }));
+      } else {
+        console.log(`DStack server listening at ${server.url}`);
+        console.log(`API token: ${server.tokenFileRelative}`);
+      }
+      const shutdown = () => void server.close().finally(() => process.exit(0));
+      process.on('SIGTERM', shutdown);
+      process.on('SIGINT', shutdown);
+    })
+    .catch((error: unknown) => {
+      console.error('Failed to start DStack server:', error instanceof Error ? error.message : error);
+      process.exit(1);
     });
-  } else if (event.type === 'approval-required') {
-    notifier.notify({
-      title: 'DStack Approval Required',
-      message: `/${event.toolName} requires your approval to proceed.`,
-      sound: true,
-      wait: false
-    });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`DStack Server listening at http://localhost:${port}`);
-});
-
-export { app };
+}

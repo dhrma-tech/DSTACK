@@ -8,6 +8,12 @@ try {
   if (result.stdout) process.stdout.write(`${result.stdout}\n`);
   if (result.stderr) process.stderr.write(`${result.stderr}\n`);
   process.exitCode = result.exitCode;
+  if (result.keepAlive) {
+    const stop = () => void result.dispose?.();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    await result.keepAlive;
+  }
 } catch (error) {
   process.stderr.write(`${errorText(error)}\n`);
   process.exitCode = 1;
