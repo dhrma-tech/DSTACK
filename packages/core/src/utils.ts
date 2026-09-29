@@ -59,3 +59,10 @@ export async function git(args: string[], cwd: string): Promise<{ stdout: string
     return { stdout: "", stderr: error instanceof Error ? error.message : String(error) };
   }
 }
+
+/** Path safe to show in UI: relative to cwd when inside it, otherwise just the folder name. */
+export function displayPath(projectRoot: string): string {
+  const rel = path.relative(process.cwd(), projectRoot);
+  if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return rel.split(path.sep).join("/");
+  return path.basename(projectRoot);
+}

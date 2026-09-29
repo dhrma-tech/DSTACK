@@ -8,7 +8,7 @@ import { ConfigManager } from "../config.js";
 import { SafetyModeManager } from "../safety/mode-manager.js";
 import { DeployManager } from "../deploy/manager.js";
 import { normalizeFreezeState } from "../deploy/freeze-state.js";
-import { shortHash } from "../utils.js";
+import { displayPath, shortHash } from "../utils.js";
 import type { Contracts } from "@dstack/shared";
 import type { DStackConfig } from "@dstack/shared";
 
@@ -41,7 +41,7 @@ export class SettingsService {
 
     const settings: Contracts.Settings = {
       projectId,
-      projectRootDisplayPath: path.relative(process.cwd(), this.options.projectRoot),
+      projectRootDisplayPath: displayPath(this.options.projectRoot),
       dstackDirRelative: path.relative(this.options.projectRoot, config.dstackDir),
       allowAbsolutePaths: this.options.allowAbsolutePaths ?? false,
       provider: this.mapProviderConfig(config),

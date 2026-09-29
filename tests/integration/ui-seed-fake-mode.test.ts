@@ -26,7 +26,7 @@ describe("UI Seed Fake Mode Integration Test", () => {
     await mkdir(path.join(tempDir, '.dstack'), { recursive: true });
     
     // Initialize basic project structure
-    await writeFile(path.join(tempDir, '.dstack', 'config.yml'), `
+    await writeFile(path.join(tempDir, '.dstack', 'config.yaml'), `
 provider: fake
 defaultModel: fake-model
 proModel: fake-pro-model

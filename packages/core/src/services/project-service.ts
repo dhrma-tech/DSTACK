@@ -8,7 +8,7 @@ import { ConfigManager } from "../config.js";
 import { LearningStore } from "../memory/learning-store.js";
 import { SafetyModeManager } from "../safety/mode-manager.js";
 import { DeployService } from "./deploy-service.js";
-import { shortHash } from "../utils.js";
+import { displayPath, shortHash } from "../utils.js";
 import type { Contracts } from "@dstack/shared";
 import type { DStackConfig } from "@dstack/shared";
 
@@ -53,7 +53,7 @@ export class ProjectService {
     const project: Contracts.Project = {
       id: projectId,
       name: path.basename(this.options.projectRoot),
-      rootDisplayPath: path.relative(process.cwd(), this.options.projectRoot),
+      rootDisplayPath: displayPath(this.options.projectRoot),
       dstackDirRelative: path.relative(this.options.projectRoot, config.dstackDir),
       workflowStage: "phase1", // TODO: Determine from current state
       updatedAt: new Date().toISOString(),
@@ -145,7 +145,7 @@ export class ProjectService {
 
     const settings: Contracts.Settings = {
       projectId,
-      projectRootDisplayPath: path.relative(process.cwd(), this.options.projectRoot),
+      projectRootDisplayPath: displayPath(this.options.projectRoot),
       dstackDirRelative: path.relative(this.options.projectRoot, config.dstackDir),
       allowAbsolutePaths: this.options.allowAbsolutePaths ?? false,
       provider: this.mapProviderConfig(config),

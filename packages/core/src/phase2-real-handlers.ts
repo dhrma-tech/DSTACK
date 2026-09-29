@@ -575,7 +575,7 @@ async function runCareful(context: SkillExecutionContext): Promise<JsonObject> {
     riskList: risks,
     unsafeOperations: ["deploy", "git write operations", "file writes", "shell execution"].map((operation) => `${operation} requires explicit approval while CAREFUL is active`),
     recommendedChecks: topRecommendations([
-      "Run health before ship or deploy decisions.",
+      "Run /health before ship or deploy decisions.",
       gitStatus.stdout.trim() ? "Inspect git status and diff." : null,
       dashboard.staleArtifacts.length > 0 ? "Re-run stale review or QA skills before proceeding." : null,
       deployState.frozen ? "Resolve freeze before deployment." : null

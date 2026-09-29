@@ -6,6 +6,9 @@
 import path from "node:path";
 import { ConfigManager } from "../config.js";
 import { RunStore, type RunRecord } from "../runs/store.js";
+import { SkillExecutor } from "../skills.js";
+import { SafetyModeManager } from "../safety/mode-manager.js";
+import { DeployManager } from "../deploy/manager.js";
 import type { Contracts } from "@dstack/shared";
 
 export interface ServiceOptions {
@@ -94,8 +97,70 @@ export class RunService {
       return await this.executeFakeSkill(run.id, request);
     }
 
-    // TODO: Implement real skill execution via SkillExecutor
-    throw new Error("Real skill execution not yet implemented");
+    return await this.executeRealSkill(run.id, request);
+  }
+
+  /**
+   * Execute skill through SkillExecutor (non-interactive: approvals are not prompted)
+   */
+  private async executeRealSkill(runId: string, request: Contracts.SkillRunRequest): Promise<Contracts.SkillRunResult> {
+    const { projectRoot } = this.options;
+    const dstackDir = path.join(projectRoot, ".dstack");
+    const config = await ConfigManager.load({
+      projectRoot,
+      cliModel: request.modelOverride ?? null,
+      cliProvider: request.providerOverride ?? null,
+      allowSecrets: this.options.allowSecrets ?? false
+    });
+    try {
+      const executor = new SkillExecutor({ config, interactive: false });
+      const result = await executor.run({
+        skillName: request.skillName,
+        inputs: request.inputs ?? {},
+        projectRoot,
+        flags: {
+          force: request.flags.force,
+          dryRun: request.flags.dryRun,
+          noStream: true,
+          model: request.modelOverride ?? null,
+          provider: request.providerOverride ?? null,
+          allowSecrets: this.options.allowSecrets ?? false,
+          jsonEvents: false
+        }
+      });
+      const safety = await new SafetyModeManager({ dstackDir }).read();
+      const freeze = await new DeployManager({ projectRoot, dstackDir }).readState();
+      const output = (result.output ?? null) as Record<string, Contracts.JsonValue> | null;
+      const runResult: Contracts.SkillRunResult = {
+        runId,
+        skillName: result.skillName,
+        status: result.status === "complete" ? "complete" : result.status,
+        verdict: result.verdict,
+        output,
+        nextSkill: result.nextSkill ?? "",
+        artifact: null,
+        runtimeStatus: { safetyMode: safety.mode, deployFrozen: freeze.frozen, deployFreezeReason: freeze.reason },
+        blockers: [],
+        warnings: result.warnings,
+        toolCalls: [],
+        provider: config.provider,
+        model: config.defaultModel
+      };
+      await this.runStore.updateRun(runId, {
+        status: runResult.status,
+        completedAt: new Date().toISOString(),
+        warnings: result.warnings,
+        result: runResult
+      });
+      return runResult;
+    } catch (error) {
+      await this.runStore.updateRun(runId, {
+        status: "error",
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   }
 
   /**
@@ -141,8 +206,12 @@ export class RunService {
    */
   async updateRunRecord(runId: string, updates: { request?: Contracts.SkillRunRequest }): Promise<void> {
     if (updates.request) {
-      await this.runStore.updateRun(runId, { 
-        request: updates.request
+      await this.runStore.updateRun(runId, {
+        request: updates.request,
+        dryRun: updates.request.flags.dryRun,
+        provider: updates.request.providerOverride ?? "gemini",
+        model: updates.request.modelOverride ?? "unknown",
+        fakeMode: updates.request.providerOverride === "fake"
       });
     }
   }
@@ -182,8 +251,10 @@ export class RunService {
 
     // If result exists, include it in the result field
     if (record.result) {
+      const { runId: _runId, ...flat } = record.result;
       return {
         ...base,
+        ...flat,
         result: record.result
       };
     }

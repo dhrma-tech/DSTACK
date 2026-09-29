@@ -88,7 +88,7 @@ export class SkillExecutor {
       const prerequisiteArtifacts: Record<string, JsonObject> = {};
       for (const required of manifest.requiresArtifacts) {
         const artifact = await this.artifacts.readLatest(required);
-        if (!artifact && !invocation.flags.force) throw new ArtifactError(`${manifest.name} requires ${required}. Run ${required} first or pass --force.`);
+        if (!artifact && !invocation.flags.force) throw new ArtifactError(`/${manifest.name} requires /${required}. Run /${required} first or pass --force.`);
         if (artifact) prerequisiteArtifacts[required] = artifact.content;
       }
       await session.event("info", "reasoning", { text: `Enforcing workflow gates for ${manifest.name}...` });
@@ -251,7 +251,7 @@ async function enforceWorkflowGates(manifest: SkillManifest, artifacts: Record<s
   }
   if (manifest.name === "ship") {
     if (artifacts.qa?.overallVerdict !== "PASS") {
-      throw new ArtifactError("ship is blocked until qa has an overallVerdict of PASS.");
+      throw new ArtifactError("/ship is blocked until /qa has an overallVerdict of PASS.");
     }
     const review = artifacts.review;
     const criticalIssues = Array.isArray(review?.criticalIssues) ? review.criticalIssues : [];

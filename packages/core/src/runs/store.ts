@@ -94,7 +94,7 @@ export class RunStore {
   /**
    * Update run status and optional result
    */
-  async updateRun(runId: string, updates: Partial<Pick<RunRecord, "status" | "startedAt" | "completedAt" | "result" | "artifactIds" | "logPath" | "warnings" | "error" | "request">>): Promise<RunRecord | null> {
+  async updateRun(runId: string, updates: Partial<Pick<RunRecord, "status" | "startedAt" | "completedAt" | "result" | "artifactIds" | "logPath" | "warnings" | "error" | "request" | "dryRun" | "provider" | "model" | "fakeMode">>): Promise<RunRecord | null> {
     const index = await this.readIndex();
     const runIndex = index.runs.findIndex(r => r.id === runId);
     

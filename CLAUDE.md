@@ -7,23 +7,28 @@
 
 ---
 
-## 0. CRITICAL REPO STATE (Read First)
+## 0. REPO STATE (verified 2026-09-29)
 
-The `main` branch has **2 commits only**. It contains:
-- `packages/shared` ✅
-- `packages/core` ✅
-- `packages/cli` ✅
-- `packages/server` ❌ LOCAL ONLY — NOT COMMITTED
-- `packages/web` ❌ LOCAL ONLY — NOT COMMITTED
+`main` has 43+ commits. All five packages (`shared`, `core`, `cli`, `server`, `web`)
+are committed. The old "server/web local only" and "modules missing" notes in
+sections 3, 4 and 16 are OUTDATED: pdf-generator, benchmark runner, skill generator,
+upgrade manager, pair-agent, landing-analyzer, codex integration and pricing.ts all
+exist. Still run `git status` / `git log --oneline` first and read files before trusting
+any status table below.
 
-All integration work (Express server, SSE streaming, Next.js frontend,
-`--json-events` CLI flag) exists on the developer's local machine but has
-never been pushed. The walkthrough summary describes intended/in-progress
-work, not merged reality.
-
-**Your first action in any session: run `git status` and `git log --oneline`
-to know the actual state. Do not assume anything from the walkthrough summary
-is in the repo unless you can read the file.**
+Verification results (after `pnpm install`):
+- `pnpm build`: passes (web + cli build). `pnpm typecheck`: passes once shared is built.
+- `pnpm skill:check`: 42 manifests valid, 10 warnings (missing behavior fields, e.g. make-pdf, scrape, pair-agent).
+- `pnpm test`: 382 pass / 12 fail / 1 skipped (6 files). Failures: `RunService` real execution
+  is a stub (`services/run-service.ts` throws "Real skill execution not yet implemented" for
+  non-fake runs); ship/autoplan gate error messages differ from test expectations; phase2-hardening
+  expects "/health" in a suggestion; ui-seed-fake-mode tests see provider "gemini" and DTOs
+  containing key/path-like strings; cli `--serve --json` test times out.
+- `pnpm lint`: 38 errors, mostly `no-explicit-any` and eslint config referencing missing
+  react-hooks rules (`set-state-in-effect`, `exhaustive-deps`).
+- Files over the 300-line cap: `phase2-real-handlers.ts` (1878), `shared/contracts.ts`, `workflow/graph.ts`,
+  `phase2-skills.ts`, `api/router.ts`, `web/lib/api.ts`, `web/lib/mock-data.ts`, `deploy/store.ts`.
+- No `tests/fixtures/artifacts/` golden files yet.
 
 ---
 
