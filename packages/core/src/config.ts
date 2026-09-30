@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
@@ -95,4 +96,18 @@ function readInt(name: string): number | undefined {
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed)) throw new ConfigError(`${name} must be an integer`);
   return parsed;
+}
+
+/**
+ * Loads `<projectRoot>/.env` into process.env. Variables already set in the environment win.
+ * Returns true if a file was loaded.
+ */
+export function loadProjectEnv(projectRoot: string): boolean {
+  const envPath = path.join(path.resolve(projectRoot), ".env");
+  if (!existsSync(envPath)) return false;
+  const before = { ...process.env };
+  process.loadEnvFile(envPath);
+  // Keep values that were set before loading, so a shell export overrides .env.
+  for (const [key, value] of Object.entries(before)) if (value !== undefined) process.env[key] = value;
+  return true;
 }

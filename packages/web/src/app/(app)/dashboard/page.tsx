@@ -8,17 +8,15 @@ import type { BadgeVariant } from '@/components/ui/Badge';
 import SuggestionBanner from '@/components/SuggestionBanner';
 import { useApp } from '@/lib/app-context';
 import { useSuggestions } from '@/hooks/useSuggestions';
-import { api, type HealthReport, type RunRecord } from '@/lib/api';
+import { api, type HealthReport } from '@/lib/api';
 
 export default function DashboardPage() {
   const { project, runs } = useApp();
   const [health, setHealth] = useState<HealthReport | null>(null);
-  const [recentRuns, setRecentRuns] = useState<RunRecord[]>([]);
   const { suggestions, loading: suggestionsLoading } = useSuggestions();
 
   useEffect(() => {
     api.getProjectHealth().then(setHealth).catch(() => null);
-    api.getRuns(10).then(setRecentRuns).catch(() => null);
   }, []);
 
   const healthColor = !health
@@ -27,7 +25,7 @@ export default function DashboardPage() {
     : health.score >= 60 ? 'var(--warning)'
     : 'var(--error)';
 
-  const displayRuns = recentRuns.length ? recentRuns : (runs as unknown as RunRecord[]);
+  const displayRuns = runs.slice(0, 10);
 
   return (
     <AppShell>

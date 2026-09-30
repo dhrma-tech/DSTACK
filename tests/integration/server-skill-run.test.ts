@@ -45,3 +45,32 @@ describe("skill runs through the server (fake provider)", () => {
     expect(list.some((run: { id: string }) => run.id === runId)).toBe(true);
   }, 120_000);
 });
+
+describe("project state reflects real runs", () => {
+  it("reports the artifact in the project, skills, health and graph", async () => {
+    // Depends on the /office-hours run above having completed in this file's server.
+    const project = await (await ts.api("/api/project")).json();
+    expect(project).toMatchObject({ name: expect.any(String), stage: "planning", artifactCounts: { latest: 1 } });
+    expect(project.artifactCounts.total).toBeGreaterThanOrEqual(1);
+
+    const skills = (await (await ts.api("/api/skills")).json()) as Array<{ name: string; hasLatestArtifact: boolean; isBlocked: boolean }>;
+    expect(skills.find((s) => s.name === "office-hours")).toMatchObject({ hasLatestArtifact: true });
+    expect(skills.find((s) => s.name === "autoplan")).toMatchObject({ isBlocked: false });
+    expect(skills.find((s) => s.name === "qa")).toMatchObject({ isBlocked: true });
+
+    const detail = await (await ts.api("/api/skills/office-hours")).json();
+    expect(detail.recentRuns.length).toBeGreaterThanOrEqual(1);
+
+    const latest = await (await ts.api("/api/artifacts/office-hours/latest")).json();
+    expect(latest).toMatchObject({ generatedAt: expect.any(String) });
+    expect(latest).not.toHaveProperty("filePath");
+
+    const health = await (await ts.api("/api/project/health")).json();
+    expect(health).toMatchObject({ score: 100, status: "HEALTHY", failing: [] });
+    expect(health.recommendations[0]).toContain("/autoplan");
+
+    const graph = await (await ts.api("/api/workflow/graph")).json();
+    expect(graph.nodes.find((n: { id: string }) => n.id === "office-hours")).toMatchObject({ status: "PASS" });
+    expect(graph.edges).toContainEqual({ from: "office-hours", to: "autoplan" });
+  });
+});

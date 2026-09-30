@@ -2,8 +2,10 @@
 import { parseArgv } from "./parser.js";
 import { errorText } from "./printer.js";
 import { route } from "./router.js";
+import { loadProjectEnv } from "@dstack/core";
 
 try {
+  loadProjectEnv(process.env.DSTACK_PROJECT_ROOT ?? process.cwd());
   const result = await route(await parseArgv());
   if (result.stdout) process.stdout.write(`${result.stdout}\n`);
   if (result.stderr) process.stderr.write(`${result.stderr}\n`);

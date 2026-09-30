@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { SkillRegistry } from '@dstack/core';
+import { CLI_ONLY_SKILLS } from '@dstack/shared';
 import type { RunRequest } from '../stream/skill-runner';
 import { HttpError } from './http';
 
@@ -22,11 +23,16 @@ export function newRunId(): string {
 /** Throws 404 unless the name is a registered skill. Returns the canonical name. */
 export async function resolveSkillName(raw: unknown): Promise<string> {
   if (typeof raw !== 'string' || !/^\/?[a-z][a-z0-9-]{0,60}$/.test(raw)) throw new HttpError(400, 'Invalid skill name', 'VALIDATION');
+  let name: string;
   try {
-    return (await registry.resolve(raw)).name;
+    name = (await registry.resolve(raw)).name;
   } catch {
     throw new HttpError(404, `Unknown skill: ${raw}`, 'UNKNOWN_SKILL');
   }
+  if (CLI_ONLY_SKILLS.includes(name)) {
+    throw new HttpError(403, `/${name} can only be run from the ds CLI.`, 'CLI_ONLY_SKILL');
+  }
+  return name;
 }
 
 export function parseInputs(raw: unknown): Record<string, string> {

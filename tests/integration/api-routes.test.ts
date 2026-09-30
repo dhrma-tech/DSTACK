@@ -7,13 +7,16 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { startDstackApiServer } from "../../packages/core/src/api/server.js";
 import type { ServerInfo } from "../../packages/core/src/api/server.js";
 import type { ApiEnvelope, Skill } from "../../packages/shared/src/contracts.js";
+import { mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 describe("API Routes Integration Tests", () => {
   let serverInfo: ServerInfo;
   const baseUrl = "http://127.0.0.1:4573"; // Use different port
-  const projectRoot = process.cwd();
+  // An isolated project, so results don't depend on what's in this repo's own .dstack folder.
+  const projectRoot = mkdtempSync(path.join(tmpdir(), "dstack-api-routes-"));
   const tokenFile = ".dstack/api/test-routes-token";
 
   beforeAll(async () => {
@@ -35,6 +38,7 @@ describe("API Routes Integration Tests", () => {
     if (serverInfo) {
       await serverInfo.close();
     }
+    rmSync(projectRoot, { recursive: true, force: true });
   });
 
   async function makeAuthenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<ApiEnvelope<unknown>> {

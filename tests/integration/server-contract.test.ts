@@ -8,6 +8,7 @@ const WEB_CALLS: Array<[method: string, path: string, body?: unknown]> = [
   ["GET", "/api/project/health"],
   ["GET", "/api/skills"],
   ["GET", "/api/skills/market"],
+  ["GET", "/api/skills/qa"],
   ["GET", "/api/runs"],
   ["GET", "/api/runs/run-1-abc"],
   ["POST", "/api/runs/run-1-abc/stop"],

@@ -13,7 +13,7 @@ import { useApp } from '@/lib/app-context';
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { project, sidebarCollapsed, setSidebarCollapsed, workflow } = useApp();
+  const { project, sidebarCollapsed, setSidebarCollapsed } = useApp();
 
   const stages = [
     { id: 'planning', label: 'Planning', icon: LayoutDashboard },
@@ -73,8 +73,8 @@ export default function AppSidebar() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
                 <div style={{ position: 'absolute', left: 7, top: 10, bottom: 10, width: 1, backgroundColor: 'var(--color-border-soft)' }} />
                 {stages.map((stage, idx) => {
-                  const isActive = workflow.currentStage === stage.id;
-                  const isComplete = idx < stages.findIndex(s => s.id === workflow.currentStage);
+                  const isActive = project.workflowStage === stage.id;
+                  const isComplete = idx < stages.findIndex(s => s.id === project.workflowStage);
                   return (
                     <div key={stage.id} style={{ 
                       display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', 

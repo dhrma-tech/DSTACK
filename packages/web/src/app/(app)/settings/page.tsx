@@ -31,11 +31,11 @@ export default function SettingsPage() {
               </code>
               <span style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 9999, fontFamily: 'var(--font-mono)', fontWeight: 500,
-                background: settings?.geminiApiKeyStatus === 'valid' ? '#edf7ee' : settings?.geminiApiKeyStatus === 'invalid' ? '#fdecea' : 'var(--canvas)',
-                color: settings?.geminiApiKeyStatus === 'valid' ? '#2e7d32' : settings?.geminiApiKeyStatus === 'invalid' ? 'var(--error)' : 'var(--muted)',
-                border: `1px solid ${settings?.geminiApiKeyStatus === 'valid' ? '#b2d9b5' : settings?.geminiApiKeyStatus === 'invalid' ? '#f0b0b0' : 'var(--hairline)'}`,
+                background: settings?.geminiApiKeyStatus === 'unverified' ? '#fff8e8' : 'var(--canvas)',
+                color: settings?.geminiApiKeyStatus === 'unverified' ? '#7d5200' : 'var(--muted)',
+                border: `1px solid ${settings?.geminiApiKeyStatus === 'unverified' ? '#e8c97a' : 'var(--hairline)'}`,
               }}>
-                {settings?.geminiApiKeyStatus === 'valid' ? 'Valid ✓' : settings?.geminiApiKeyStatus === 'invalid' ? 'Invalid ✗' : 'Not configured'}
+                {settings?.geminiApiKeyStatus === 'unverified' ? 'Key found (not yet verified)' : 'Not configured'}
               </span>
             </div>
           </Section>

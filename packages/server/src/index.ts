@@ -9,7 +9,8 @@ export const READY_PREFIX = 'DSTACK_READY ';
 
 // Run directly (`pnpm server`, `ds --serve`) rather than imported by tests.
 if (require.main === module) {
-  const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '3001', 10);
+  // Only API_PORT: the generic PORT is also read by Next.js, and sharing it puts both on one port.
+  const port = Number.parseInt(process.env.API_PORT ?? '3001', 10);
   startServer({
     port,
     host: process.env.API_HOST ?? '127.0.0.1',

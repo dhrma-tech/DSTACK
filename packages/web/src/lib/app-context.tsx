@@ -1,31 +1,27 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  MOCK_PROJECT, MOCK_SKILLS, MOCK_RUNS, MOCK_ARTIFACTS, MOCK_WORKFLOW,
-  MOCK_BROWSER_SNAPSHOTS, MOCK_DEPLOY_RUNS, MOCK_BENCHMARK_RUNS, MOCK_LEARNINGS, MOCK_EXECUTION_SESSION,
-  type Project, type Skill, type SkillRun, type Artifact, type WorkflowGraph, type ExecutionTurn,
-  type BenchmarkRun, type Learning, type BrowserSnapshot, type DeployRun
-} from './mock-data';
+import { api, DStackAPIError, type SkillSummary, type WorkflowGraph } from './api';
+import { EMPTY_PROJECT, toArtifactView, toProjectView, toRunView, type ArtifactView, type ProjectView, type RunView } from './view-models';
+
+const REFRESH_MS = 5000;
+const EMPTY_WORKFLOW: WorkflowGraph = { nodes: [], edges: [] };
 
 interface AppState {
-  project: Project;
-  skills: Skill[];
-  runs: SkillRun[];
-  artifacts: Artifact[];
+  project: ProjectView;
+  skills: SkillSummary[];
+  runs: RunView[];
+  artifacts: ArtifactView[];
   workflow: WorkflowGraph;
-  snapshots: BrowserSnapshot[];
-  deployRuns: DeployRun[];
-  benchmarkRuns: BenchmarkRun[];
-  learnings: Learning[];
-  executionSession: ExecutionTurn[];
+  /** True until the first load finishes. */
+  isLoading: boolean;
+  /** Why the last load failed, or null. Data from the last successful load stays visible. */
+  loadError: string | null;
+  refresh: () => Promise<void>;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
-  addRun: (run: SkillRun) => void;
-  updateProject: (partial: Partial<Project>) => void;
   toast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  isLoading: boolean;
 }
 
 export interface ToastMessage {
@@ -36,115 +32,68 @@ export interface ToastMessage {
 
 const AppContext = createContext<AppState | null>(null);
 
-import { apiClient } from './api-client';
+function describeError(error: unknown): string {
+  if (error instanceof DStackAPIError) return error.message;
+  return "Can't reach the DStack server. Start it with `pnpm server`.";
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [project, setProject] = useState<Project>(MOCK_PROJECT);
-  const [skills, setSkills] = useState<Skill[]>(MOCK_SKILLS);
-  const [artifacts, setArtifacts] = useState<Artifact[]>(MOCK_ARTIFACTS);
-  const [workflow, setWorkflow] = useState<WorkflowGraph>(MOCK_WORKFLOW);
-  const [runs, setRuns] = useState<SkillRun[]>(MOCK_RUNS);
+  const [project, setProject] = useState<ProjectView>(EMPTY_PROJECT);
+  const [skills, setSkills] = useState<SkillSummary[]>([]);
+  const [artifacts, setArtifacts] = useState<ArtifactView[]>([]);
+  const [workflow, setWorkflow] = useState<WorkflowGraph>(EMPTY_WORKFLOW);
+  const [runs, setRuns] = useState<RunView[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random();
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `${Date.now()}-${Math.random()}`;
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
-  };
-
-  React.useEffect(() => {
-    async function loadData() {
-      try {
-        const [projRes, artifactsRes, runsRes, skillsRes] = await Promise.all([
-          apiClient.getProject().catch(() => null),
-          apiClient.getArtifacts().catch(() => null),
-          apiClient.getRuns().catch(() => null),
-          apiClient.getSkills().catch(() => null)
-        ]);
-
-        if (projRes) {
-          setProject(prev => ({
-            ...prev,
-            name: projRes.name ?? prev.name,
-            safetyMode: { mode: projRes.safetyMode ?? prev.safetyMode.mode, reason: prev.safetyMode.reason },
-            provider: {
-              current: projRes.providerMode === 'FAKE' ? 'fake' as const : 'gemini' as const,
-              geminiConfigured: projRes.providerMode !== 'FAKE'
-            },
-            workflowStage: projRes.stage || prev.workflowStage,
-          }));
-
-          setWorkflow(prev => ({
-            ...prev,
-            currentStage: projRes.stage || prev.currentStage
-          }));
-        }
-
-        if (skillsRes && Array.isArray(skillsRes)) {
-          setSkills(skillsRes as unknown as Skill[]);
-        }
-        if (runsRes && Array.isArray(runsRes)) {
-          setRuns(runsRes as unknown as SkillRun[]);
-        }
-
-        if (artifactsRes && Array.isArray(artifactsRes)) {
-          setArtifacts(artifactsRes.map(a => ({
-            id: `${a.skillName}-${a.timestamp}`,
-            skillName: a.skillName,
-            artifactType: a.skillName,
-            version: 'v1',
-            isLatest: true,
-            verdict: a.verdict ?? null,
-            createdAt: a.timestamp,
-            relativePath: a.path.split('.dstack/')[1] || a.path,
-            summary: `${a.verdict ?? 'UNKNOWN'} result from /${a.skillName}`,
-            warnings: [],
-            content: a.content || { note: 'Artifact data available on click' }
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to load initial data from backend:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadData();
-    
-    // Auto-refresh every 5 seconds to keep artifacts up to date
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
   }, []);
 
-  const addRun = (run: SkillRun) => setRuns(prev => [run, ...prev]);
-  const updateProject = (partial: Partial<Project>) =>
-    setProject(prev => ({ ...prev, ...partial }));
+  const refresh = useCallback(async () => {
+    try {
+      const [projectState, artifactList, runList, skillList, graph] = await Promise.all([
+        api.getProject(),
+        api.getArtifacts(),
+        api.getRuns(),
+        api.getSkills(),
+        api.getWorkflowGraph()
+      ]);
+      setProject(toProjectView(projectState));
+      setArtifacts(artifactList.map(toArtifactView));
+      setRuns(runList.map(toRunView));
+      setSkills(skillList);
+      setWorkflow(graph);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(describeError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // The first load happens in a timer callback, not synchronously in the effect body.
+    const first = setTimeout(() => void refresh(), 0);
+    const interval = setInterval(() => void refresh(), REFRESH_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+    };
+  }, [refresh]);
 
   return (
     <AppContext.Provider value={{
-      project,
-      skills,
-      runs,
-      artifacts,
-      workflow,
-      snapshots: MOCK_BROWSER_SNAPSHOTS,
-      deployRuns: MOCK_DEPLOY_RUNS,
-      benchmarkRuns: MOCK_BENCHMARK_RUNS,
-      learnings: MOCK_LEARNINGS,
-      executionSession: MOCK_EXECUTION_SESSION,
-      sidebarCollapsed,
-      setSidebarCollapsed,
-      addRun,
-      updateProject,
-      toast: showToast,
-      isLoading,
+      project, skills, runs, artifacts, workflow, isLoading, loadError, refresh,
+      sidebarCollapsed, setSidebarCollapsed, toast: showToast
     }}>
       {children}
       {toasts.length > 0 && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 9999 }}>
+        <div role="status" aria-live="polite" style={{ position: 'fixed', bottom: 24, right: 24, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 9999 }}>
           {toasts.map(t => (
             <div key={t.id} className={`toast toast-${t.type}`} style={{
               padding: '12px 16px', borderRadius: 'var(--radius-md)', fontSize: 13, fontWeight: 500,

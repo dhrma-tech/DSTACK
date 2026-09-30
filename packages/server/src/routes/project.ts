@@ -1,68 +1,58 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { Router, type Router as RouterType } from 'express';
-import { SafetyModeManager, DeployManager, git } from '@dstack/core';
-import type { SafetyModeName } from '@dstack/shared';
+import { ArtifactStore, ConfigManager, DeployManager, git, projectHealth, projectStage, SafetyModeManager } from '@dstack/core';
 import { getDstackDir, getProjectRoot } from '../context';
+import { asyncRoute } from '../lib/http';
+import { currentPipeline } from '../lib/pipeline';
 
 export const projectRouter: RouterType = Router();
 
-const SAFETY_MODES: readonly SafetyModeName[] = ['NORMAL', 'CAREFUL', 'GUARD'];
-const safety = () => new SafetyModeManager({ dstackDir: getDstackDir() });
-const deploy = () => new DeployManager({ projectRoot: getProjectRoot(), dstackDir: getDstackDir() });
-
-projectRouter.get('/', async (req, res) => {
-  const projectRoot = getProjectRoot();
-  const [safetyState, freezeState, branchInfo, headInfo] = await Promise.all([
-    safety().read(),
-    deploy().readState(),
-    git(['branch', '--show-current'], projectRoot),
-    git(['rev-parse', '--short', 'HEAD'], projectRoot)
-  ]);
-  
-  res.json({
-    name: 'DStack',
-    branch: branchInfo.stdout.trim() || 'main',
-    head: headInfo.stdout.trim() || 'unknown',
-    stage: 'planning',
-    safetyMode: safetyState.mode,
-    freezeState: freezeState.frozen,
-    providerMode: (process.env.DSTACK_PROVIDER || 'gemini').toUpperCase()
-  });
-});
-
-projectRouter.post('/settings', async (req, res) => {
-  const { safetyMode, freezeState } = req.body as { safetyMode?: string; freezeState?: boolean };
-
+async function projectName(root: string): Promise<string> {
   try {
-    if (safetyMode !== undefined && !SAFETY_MODES.includes(safetyMode as SafetyModeName)) {
-      res.status(400).json({ error: 'safetyMode must be NORMAL, CAREFUL or GUARD', code: 'VALIDATION' });
-      return;
-    }
-    if (safetyMode) {
-      await safety().setMode(safetyMode as SafetyModeName, null, `Manually set from UI to ${safetyMode}`);
-    }
-
-    if (freezeState !== undefined) {
-      if (freezeState) {
-        await deploy().freeze('Manually frozen from UI', null, null, 'dstack-ui');
-      } else {
-        await deploy().unfreeze();
-      }
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Failed to update project settings:', err);
-    res.status(500).json({ error: 'Failed to update settings' });
+    const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf-8')) as { name?: unknown };
+    if (typeof pkg.name === 'string' && pkg.name) return pkg.name;
+  } catch {
+    // No package.json; fall back to the folder name.
   }
-});
+  return path.basename(root);
+}
 
-projectRouter.get('/health', (req, res) => {
+projectRouter.get('/', asyncRoute(async (_req, res) => {
+  const projectRoot = getProjectRoot();
+  const dstackDir = getDstackDir();
+  const [name, config, safety, freeze, branch, head, pipeline] = await Promise.all([
+    projectName(projectRoot),
+    ConfigManager.load({ projectRoot }),
+    new SafetyModeManager({ dstackDir }).read(),
+    new DeployManager({ projectRoot, dstackDir }).readState(),
+    git(['branch', '--show-current'], projectRoot),
+    git(['rev-parse', '--short', 'HEAD'], projectRoot),
+    currentPipeline()
+  ]);
+  const artifacts = new ArtifactStore(dstackDir);
+  const withArtifacts = pipeline.nodes.filter((node) => node.artifactAt);
+  const versionCounts = await Promise.all(withArtifacts.map(async (node) => (await artifacts.list(node.skillName)).length));
+
   res.json({
-    score: 100,
-    status: 'HEALTHY',
-    recommendations: []
+    name,
+    branch: branch.stdout.trim() || null,
+    head: head.stdout.trim() || null,
+    stage: projectStage(pipeline),
+    safetyMode: safety.mode,
+    safetyReason: safety.reason ?? null,
+    freezeState: freeze.frozen,
+    freezeReason: freeze.reason ?? null,
+    providerMode: config.provider.toUpperCase(),
+    geminiConfigured: Boolean(config.geminiApiKey),
+    artifactCounts: {
+      total: versionCounts.reduce((sum, count) => sum + count, 0),
+      latest: withArtifacts.length,
+      stale: pipeline.nodes.filter((node) => node.status === 'stale').length
+    }
   });
-});
+}));
 
-
-
+projectRouter.get('/health', asyncRoute(async (_req, res) => {
+  res.json(projectHealth(await currentPipeline()));
+}));

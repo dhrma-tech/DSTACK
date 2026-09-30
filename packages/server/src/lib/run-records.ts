@@ -16,6 +16,9 @@ export interface RunRecord {
   durationMs: number | null;
   provider: string;
   toolCallCount: number;
+  /** What the run was started with, so it can be re-run. */
+  inputs: Record<string, string>;
+  flags: { force?: boolean; dryRun?: boolean; provider?: 'gemini' | 'fake' };
   events: RunEvent[];
 }
 

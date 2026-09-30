@@ -35,7 +35,8 @@ artifactsRouter.get('/', asyncRoute(async (_req, res) => {
 artifactsRouter.get('/:skillName/latest', asyncRoute(async (req, res) => {
   const latest = await store().readLatest(skillParam(req.params.skillName));
   if (!latest) throw new HttpError(404, 'Artifact not found', 'NOT_FOUND');
-  res.json(toProjectRelative(latest));
+  // The artifact's own JSON (skillName, generatedAt, overallVerdict, ...), per the API contract.
+  res.json(toProjectRelative(latest.content));
 }));
 
 artifactsRouter.get('/:skillName/diff', asyncRoute(async (req, res) => {
@@ -48,7 +49,7 @@ artifactsRouter.get('/:skillName/diff', asyncRoute(async (req, res) => {
   const semanticSummary = newArt.verdict !== oldArt.verdict
     ? `Verdict changed from ${oldArt.verdict ?? 'none'} to ${newArt.verdict ?? 'none'}.`
     : 'Verdict unchanged.';
-  res.json(toProjectRelative({ v1: oldArt, v2: newArt, semanticSummary }));
+  res.json(toProjectRelative({ v1: oldArt.content, v2: newArt.content, v1Id: v1, v2Id: v2, semanticSummary }));
 }));
 
 artifactsRouter.get('/:skillName', asyncRoute(async (req, res) => {

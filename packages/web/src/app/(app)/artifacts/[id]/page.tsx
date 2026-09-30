@@ -7,151 +7,147 @@ import JsonViewer from '@/components/JsonViewer';
 import { useApp } from '@/lib/app-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Box, Download, Clock, History, AlertTriangle, GitCompare } from 'lucide-react';
+import { Box, Download, Clock, History, GitCompare } from 'lucide-react';
 import ArtifactDiff from '@/components/ArtifactDiff';
-import { api, type ArtifactDiff as ArtifactDiffType } from '@/lib/api';
+import { api, type ArtifactDiff as ArtifactDiffType, type ArtifactVersion } from '@/lib/api';
 
+// The route segment is the skill name: this page shows that skill's latest artifact and its history.
 export default function ArtifactDetailPage() {
   const params = useParams();
-  const artifactId = params.id as string;
-  const { artifacts } = useApp();
+  const skillName = params.id as string;
+  const { artifacts, isLoading } = useApp();
   const [compareVersion, setCompareVersion] = React.useState<string | null>(null);
   // The diff we last fetched, tagged with the version it was for. Loading and the visible
   // diff are derived from it, so switching versions never shows a stale diff.
   const [fetchedDiff, setFetchedDiff] = React.useState<{ version: string; data: ArtifactDiffType | null } | null>(null);
+  const [versions, setVersions] = React.useState<ArtifactVersion[]>([]);
 
-  const artifact = artifacts.find(a => a.id === artifactId);
+  const artifact = artifacts.find(a => a.skillName === skillName);
   const diffData = compareVersion && fetchedDiff?.version === compareVersion ? fetchedDiff.data : null;
   const diffLoading = compareVersion !== null && fetchedDiff?.version !== compareVersion;
 
   React.useEffect(() => {
-    if (!compareVersion || !artifact) return;
     let cancelled = false;
-    // v1 is old (compareVersion), v2 is new (current artifact)
-    api.getArtifactDiff(artifact.skillName, compareVersion, artifact.version)
+    api.getArtifactVersions(skillName)
+      .then((list) => list, () => [])
+      .then((list) => { if (!cancelled) setVersions([...list].reverse()); });
+    return () => { cancelled = true; };
+  }, [skillName, artifact?.createdAt]);
+
+  React.useEffect(() => {
+    if (!compareVersion) return;
+    let cancelled = false;
+    // v1 is the older version, v2 is the current latest.
+    api.getArtifactDiff(skillName, compareVersion, 'latest')
       .then((data) => data, () => null)
       .then((data) => { if (!cancelled) setFetchedDiff({ version: compareVersion, data }); });
     return () => { cancelled = true; };
-  }, [compareVersion, artifact]);
+  }, [compareVersion, skillName]);
 
   if (!artifact) {
     return (
-      <AppShell breadcrumbs={[{ label: 'Artifacts', href: '/artifacts' }, { label: artifactId }]}>
+      <AppShell breadcrumbs={[{ label: 'Artifacts', href: '/artifacts' }, { label: skillName }]}>
         <div style={{ padding: 32, textAlign: 'center' }}>
-          <h2 style={{ fontSize: 20, fontFamily: 'var(--font-sans)', marginBottom: 8 }}>Artifact not found</h2>
-          <p style={{ color: 'var(--color-text-muted)', marginBottom: 16 }}>No artifact with ID &quot;{artifactId}&quot; exists.</p>
-          <Link href="/artifacts" className="btn btn-secondary">← Back to Artifacts</Link>
+          {isLoading ? (
+            <div className="skeleton skeleton-block" style={{ height: 120, maxWidth: 480, margin: '0 auto' }} />
+          ) : (
+            <>
+              <h2 style={{ fontSize: 20, fontFamily: 'var(--font-sans)', marginBottom: 8 }}>No artifact for /{skillName} yet</h2>
+              <p style={{ color: 'var(--color-text-muted)', marginBottom: 16 }}>Run /{skillName} to create one.</p>
+              <Link href="/artifacts" className="btn btn-secondary">← Back to Artifacts</Link>
+            </>
+          )}
         </div>
       </AppShell>
     );
   }
 
-  const filename = artifact.relativePath.split('/').pop() || artifact.id;
-  const otherVersions = artifacts.filter(a => a.relativePath === artifact.relativePath && a.id !== artifact.id);
+  const filename = artifact.relativePath.split('/').pop() || `${skillName}.json`;
+  const olderVersions = versions.slice(1);
+
+  const downloadJson = () => {
+    const blob = new Blob([JSON.stringify(artifact.content, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${skillName}-artifact.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <AppShell
-      breadcrumbs={[{ label: 'Artifacts', href: '/artifacts' }, { label: filename }]}
+      breadcrumbs={[{ label: 'Artifacts', href: '/artifacts' }, { label: `/${skillName}` }]}
       actions={
-        <button className="btn btn-primary" style={{ fontSize: 12, height: 30, padding: '0 12px' }}>
+        <button className="btn btn-primary" onClick={downloadJson} style={{ fontSize: 12, height: 30, padding: '0 12px' }}>
           <Download size={12} /> Download JSON
         </button>
       }
     >
       <div style={{ padding: 32 }}>
-        {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <h1 style={{ fontSize: 28, fontFamily: 'var(--font-serif)' }}>{filename}</h1>
-            {artifact.isLatest && <span className="badge badge-success" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 10 }}>Latest</span>}
+            <h1 style={{ fontSize: 28, fontFamily: 'var(--font-serif)' }}>/{skillName}</h1>
+            <span className="badge badge-success" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 10 }}>Latest</span>
             {artifact.verdict && <StatusBadge status={artifact.verdict === 'PASS' ? 'success' : artifact.verdict === 'FAIL' ? 'error' : 'warning'} label={artifact.verdict} />}
           </div>
-          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--color-text-tertiary)' }}>
-            <span>Skill: <strong style={{ color: 'var(--color-text-primary)' }}>{artifact.skillName}</strong></span>
-            <span>Version: <strong>{artifact.version}</strong></span>
-            <span>Type: <strong>{artifact.artifactType}</strong></span>
+          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--color-text-tertiary)', flexWrap: 'wrap' }}>
+            <span>Versions: <strong>{versions.length || 1}</strong></span>
             <span>Path: <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{artifact.relativePath}</strong></span>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, height: 'calc(100vh - 250px)' }}>
-          {/* Main Viewer */}
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, height: 'calc(100vh - 250px)' }}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             {compareVersion ? (
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 {diffLoading ? (
-                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading diff...</div>
+                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading diff…</div>
                 ) : diffData ? (
                   <ArtifactDiff v1={diffData.v1} v2={diffData.v2} semanticSummary={diffData.semanticSummary} />
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--error)' }}>Failed to load diff</div>
+                  <div role="alert" style={{ padding: 40, textAlign: 'center', color: 'var(--error)' }}>Couldn&apos;t load this comparison. The version may have been removed.</div>
                 )}
               </div>
             ) : (
-              <JsonViewer data={artifact.content || { error: "No content available" }} title={filename} />
+              <JsonViewer data={artifact.content ?? {}} title={filename} />
             )}
           </div>
 
-          {/* Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Summary */}
             <div className="card" style={{ padding: 20 }}>
               <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', marginBottom: 12 }}>Summary</h3>
-              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                {artifact.summary || 'No summary provided for this artifact.'}
-              </p>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{artifact.summary}</p>
             </div>
 
-            {/* Warnings */}
-            {artifact.warnings.length > 0 && (
-              <div className="card" style={{ padding: 20, border: '1px solid rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.02)' }}>
-                <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-warning)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AlertTriangle size={12} /> Warnings
-                </h3>
-                {artifact.warnings.map((w: string, i: number) => (
-                  <div key={i} style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>• {w}</div>
-                ))}
-              </div>
-            )}
-
-            {/* History */}
             <div className="card" style={{ padding: 20 }}>
               <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <History size={12} /> Version History
+                <History size={12} /> Version history
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--color-primary-soft)', border: '1px solid var(--color-primary-soft)' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>{artifact.version} (Current)</span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Now</span>
-                </div>
-                {otherVersions.map((v: { id: string; version: string; createdAt: string }) => (
-                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Link href={`/artifacts/${v.id}`} style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-soft)')}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{v.version}</span>
-                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{new Date(v.createdAt).toLocaleDateString()}</span>
-                    </Link>
-                    <button
-                      onClick={() => setCompareVersion(compareVersion === v.version ? null : v.version)}
-                      title="Compare with current"
-                      style={{
-                        padding: '4px 6px', borderRadius: 4, border: 'none', cursor: 'pointer',
-                        background: compareVersion === v.version ? 'var(--coral-bg)' : 'transparent',
-                        color: compareVersion === v.version ? 'var(--coral)' : 'var(--muted)',
-                      }}
-                      onMouseEnter={e => { if (compareVersion !== v.version) e.currentTarget.style.color = 'var(--ink)' }}
-                      onMouseLeave={e => { if (compareVersion !== v.version) e.currentTarget.style.color = 'var(--muted)' }}
-                    >
-                      <GitCompare size={14} />
-                    </button>
-                  </div>
+                <button onClick={() => setCompareVersion(null)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: compareVersion === null ? 'var(--color-primary-soft)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>Latest</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{new Date(artifact.createdAt).toLocaleString()}</span>
+                </button>
+                {olderVersions.length === 0 && <p style={{ fontSize: 12, color: 'var(--muted)' }}>No earlier versions.</p>}
+                {olderVersions.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => setCompareVersion(compareVersion === v.id ? null : v.id)}
+                    aria-pressed={compareVersion === v.id}
+                    aria-label={`Compare latest with version from ${new Date(v.timestamp).toLocaleString()}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', padding: '6px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      border: 'none', background: compareVersion === v.id ? 'var(--coral-bg)' : 'transparent', color: compareVersion === v.id ? 'var(--coral)' : 'var(--color-text-secondary)'
+                    }}
+                  >
+                    <span style={{ fontSize: 12 }}>{new Date(v.timestamp).toLocaleString()}{v.verdict ? ` · ${v.verdict}` : ''}</span>
+                    <GitCompare size={14} />
+                  </button>
                 ))}
               </div>
             </div>
 
-            {/* Metadata */}
             <div className="card" style={{ padding: 20 }}>
               <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', marginBottom: 12 }}>Metadata</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -161,7 +157,7 @@ export default function ArtifactDetailPage() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Box size={12} style={{ color: 'var(--color-text-muted)' }} />
-                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Skill: {artifact.skillName}</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Skill: /{skillName}</span>
                 </div>
               </div>
             </div>

@@ -1,93 +1,92 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import Badge from '@/components/ui/Badge';
-import type { BadgeVariant } from '@/components/ui/Badge';
 import { useApp } from '@/lib/app-context';
-import type { SkillRun } from '@/lib/mock-data';
 
 export default function RunsPage() {
-  const { runs } = useApp();
+  const { runs, isLoading, loadError } = useApp();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selected = runs.find(r => r.id === selectedId) as SkillRun | undefined ?? null;
+  const selected = runs.find(r => r.id === selectedId) ?? null;
 
   return (
     <AppShell>
       <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-        {/* Left list */}
         <div style={{ width: 360, flexShrink: 0, borderRight: '1px solid var(--hairline)', overflowY: 'auto', background: '#fff' }}>
           <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid var(--hairline)' }}>
             <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 400, color: 'var(--ink)' }}>Run History</h1>
           </div>
-          {runs.length === 0 && (
+          {loadError && (
+            <div role="alert" style={{ padding: 16, fontSize: 13, color: 'var(--error)' }}>{loadError}</div>
+          )}
+          {isLoading && [1, 2, 3].map(i => <div key={i} className="skeleton skeleton-block" style={{ height: 48, margin: '8px 16px' }} />)}
+          {!isLoading && !loadError && runs.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              No runs yet.
+              No runs yet. Start one from the <Link href="/workspace" style={{ color: 'var(--coral)' }}>workspace</Link>, beginning with /office-hours.
             </div>
           )}
-          {(runs as SkillRun[]).map(run => (
-            <div
+          {runs.map(run => (
+            <button
               key={run.id}
               onClick={() => setSelectedId(run.id)}
+              aria-pressed={selectedId === run.id}
               style={{
-                padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--hairline)',
+                display: 'block', width: '100%', textAlign: 'left', border: 'none', borderBottom: '1px solid var(--hairline)',
+                padding: '10px 16px', cursor: 'pointer',
                 background: selectedId === run.id ? 'var(--coral-bg)' : '#fff',
                 borderLeft: selectedId === run.id ? '2px solid var(--coral)' : '2px solid transparent',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>
-                  /{run.skillName}
-                </span>
-                {run.verdict && <Badge variant={run.verdict as BadgeVariant}>{run.verdict}</Badge>}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>/{run.skillName}</span>
+                {run.verdict && <Badge variant={run.verdict}>{run.verdict}</Badge>}
+                {run.status === 'running' && <Badge variant="RUNNING">RUNNING</Badge>}
                 {run.fakeMode && <Badge variant="FAKE">FAKE</Badge>}
               </div>
               <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-                <span>{new Date(run.requestedAt).toLocaleString()}</span>
+                <span>{new Date(run.startedAt).toLocaleString()}</span>
                 <span>{run.duration}</span>
+                <span>{run.source === 'cli' ? 'CLI' : 'Web'}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Right detail */}
         <div style={{ flex: 1, overflowY: 'auto', background: 'var(--canvas)', padding: 24 }}>
           {!selected ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-              <p style={{ fontSize: 14, color: 'var(--muted)' }}>Select a run to view details</p>
+              <p style={{ fontSize: 14, color: 'var(--muted)' }}>Select a run to see its details</p>
             </div>
           ) : (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 500, color: 'var(--coral)' }}>
-                  /{selected.skillName}
-                </h2>
-                {selected.verdict && <Badge variant={selected.verdict as BadgeVariant}>{selected.verdict}</Badge>}
+                <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 500, color: 'var(--coral)' }}>/{selected.skillName}</h2>
+                {selected.verdict && <Badge variant={selected.verdict}>{selected.verdict}</Badge>}
                 {selected.fakeMode && <Badge variant="FAKE">FAKE</Badge>}
+                {selected.source === 'web' && (
+                  <Link href={`/runs/${encodeURIComponent(selected.id)}`} style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--coral)' }}>Open run →</Link>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
                 {[
                   { label: 'Duration', value: selected.duration },
                   { label: 'Provider', value: selected.provider },
-                  { label: 'Model',    value: selected.model },
-                  { label: 'Dry Run', value: selected.dryRun ? 'Yes' : 'No' },
-                  { label: 'Status',  value: selected.status },
-                  { label: 'Run ID',  value: selected.id },
+                  { label: 'Started from', value: selected.source === 'cli' ? 'ds CLI' : 'Web' },
+                  { label: 'Tool calls', value: String(selected.toolCallCount) },
+                  { label: 'Status', value: selected.status },
+                  { label: 'Run ID', value: selected.id },
                 ].map(({ label, value }) => (
-                  <div key={label} style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 8, padding: 12 }}>
+                  <div key={label} style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 8, padding: 12, minWidth: 0 }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>{value}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', overflowWrap: 'anywhere' }}>{value}</div>
                   </div>
                 ))}
               </div>
-              {selected.warnings.length > 0 && (
-                <div style={{ background: '#fff8e8', border: '1px solid #e8c97a', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#7d5200', marginBottom: 6 }}>Warnings</div>
-                  {selected.warnings.map((w, i) => (
-                    <p key={i} style={{ fontSize: 13, color: '#7d5200', marginTop: 2 }}>• {w}</p>
-                  ))}
-                </div>
+              {selected.source === 'cli' && (
+                <p style={{ fontSize: 13, color: 'var(--muted)' }}>This run was started from the ds CLI, so only its summary is available here. The full log is in .dstack/logs.</p>
               )}
             </div>
           )}

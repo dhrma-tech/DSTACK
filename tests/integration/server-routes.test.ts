@@ -160,3 +160,26 @@ describe("run routes", () => {
     expect((await ts.api("/api/skills/office-hours/run", json({ provider: "openai" }))).status).toBe(400);
   });
 });
+
+describe("skill access over HTTP", () => {
+  it("refuses skills that may only run from the ds CLI", async () => {
+    for (const skill of ["setup-browser-cookies", "dstack-upgrade", "canary", "pair-agent"]) {
+      const res = await ts.api(`/api/skills/${skill}/run`, json({ inputs: {} }));
+      expect(res.status, skill).toBe(403);
+      expect(await res.json()).toMatchObject({ code: "CLI_ONLY_SKILL" });
+    }
+    const chain = await ts.api("/api/chain/run", json({ chain: ["office-hours", "canary"] }));
+    expect(chain.status).toBe(403);
+  });
+
+  it("marks CLI-only skills unavailable in the skill list", async () => {
+    const skills = (await (await ts.api("/api/skills")).json()) as Array<{ name: string; available: boolean; cliOnly: boolean }>;
+    expect(skills).toHaveLength(42);
+    expect(skills.find((s) => s.name === "canary")).toMatchObject({ available: false, cliOnly: true });
+    expect(skills.find((s) => s.name === "qa")).toMatchObject({ available: true, cliOnly: false });
+  });
+
+  it("returns an empty skill market instead of invented listings", async () => {
+    expect(await (await ts.api("/api/skills/market")).json()).toEqual([]);
+  });
+});

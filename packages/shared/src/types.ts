@@ -428,3 +428,15 @@ export interface SkillSuggestion {
   risk: string;
   category: "critical" | "recommended" | "optional";
 }
+
+export type ProjectHealthStatus = "HEALTHY" | "DEGRADED" | "CRITICAL";
+
+export interface ProjectHealth {
+  /** 0–100. Starts at 100; failures, stale results and revision requests lower it. */
+  score: number;
+  status: ProjectHealthStatus;
+  failing: string[];
+  stale: string[];
+  revise: string[];
+  recommendations: string[];
+}

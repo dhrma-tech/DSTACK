@@ -6,13 +6,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { startDstackApiServer } from "../../packages/core/src/api/server.js";
 import type { ServerInfo } from "../../packages/core/src/api/server.js";
+import { mkdtempSync, rmSync } from "node:fs";
 import { readFile, access } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 describe("API Server Integration Tests", () => {
   let serverInfo: ServerInfo;
   let baseUrl: string;
-  const projectRoot = process.cwd();
+  // An isolated project, so the test never writes into this repo's own .dstack folder.
+  const projectRoot = mkdtempSync(path.join(tmpdir(), "dstack-api-server-"));
   const tokenFile = ".dstack/api/test-token";
 
   beforeAll(async () => {
@@ -47,6 +50,7 @@ describe("API Server Integration Tests", () => {
     if (serverInfo) {
       await serverInfo.close();
     }
+    rmSync(projectRoot, { recursive: true, force: true });
   });
 
   test("server starts on 127.0.0.1", async () => {

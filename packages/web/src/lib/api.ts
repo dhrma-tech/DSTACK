@@ -37,230 +37,35 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── Shared types ─────────────────────────────────────────────────────────────
+import type {
+  ProjectState,
+  HealthReport,
+  SkillSummary,
+  SkillDetail,
+  RunSummary,
+  RunRecord,
+  ArtifactMeta,
+  ArtifactVersion,
+  Artifact,
+  ArtifactDiff,
+  WorkflowGraph,
+  DeployConfig,
+  DeployState,
+  SafetyModeState,
+  ScaffoldTemplate,
+  MarketSkill,
+  LearningEntry,
+  BenchmarkRun,
+  ScreenshotAsset,
+  Settings,
+  DeployRun,
+  HistoryEntry,
+  WorkflowSuggestion,
+  Template,
+  ShellEvent,
+} from './api-types';
 
-export interface ProjectState {
-  name: string;
-  branch: string;
-  head: string;
-  stage: string;
-  safetyMode: 'NORMAL' | 'CAREFUL' | 'GUARD';
-  freezeState: boolean;
-  providerMode: string;
-}
-
-export interface HealthReport {
-  score: number;
-  status: 'HEALTHY' | 'DEGRADED' | 'CRITICAL';
-  recommendations: string[];
-}
-
-export interface SkillSummary {
-  name: string;
-  command: string;
-  description: string;
-  stage: string;
-  model: string;
-  maturity: 'complete' | 'partial' | 'experimental';
-  available: boolean;
-  hasLatestArtifact: boolean;
-  lastRunAt: string | null;
-  lastVerdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  isBlocked: boolean;
-  requiresArtifacts: string[];
-  allowedTools: string[];
-  nextSkill: string | null;
-}
-
-export interface SkillDetail extends SkillSummary {
-  recentRuns: RunRecord[];
-}
-
-export interface RunRecord {
-  id: string;
-  skillName: string;
-  startedAt: string;
-  completedAt: string | null;
-  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  durationMs: number | null;
-  provider: string;
-  toolCallCount: number;
-  events: ShellEvent[];
-}
-
-export interface ArtifactMeta {
-  skillName: string;
-  timestamp: string;
-  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  path: string;
-  content?: unknown;
-}
-
-export interface ArtifactVersion {
-  timestamp: string;
-  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  path: string;
-}
-
-export interface Artifact {
-  skillName: string;
-  generatedAt: string;
-  overallVerdict?: 'PASS' | 'REVISE' | 'FAIL';
-  [key: string]: unknown;
-}
-
-export interface ArtifactDiff {
-  v1: Artifact;
-  v2: Artifact;
-  semanticSummary?: string;
-}
-
-export interface WorkflowNode {
-  id: string;
-  skillName: string;
-  label: string;
-  phase: string;
-  status: 'not_started' | 'ready' | 'running' | 'PASS' | 'REVISE' | 'FAIL' | 'BLOCKED' | 'STALE';
-  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  timestamp: string | null;
-  isStale: boolean;
-}
-
-export interface WorkflowEdge {
-  from: string;
-  to: string;
-}
-
-export interface WorkflowGraph {
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-}
-
-export interface DeployConfig {
-  platform: string;
-  deployCommand: string;
-  healthCheckUrl?: string;
-}
-
-export interface DeployState {
-  frozen: boolean;
-  reason?: string;
-  frozenAt?: string;
-}
-
-export interface SafetyModeState {
-  mode: 'NORMAL' | 'CAREFUL' | 'GUARD';
-  reason: string | null;
-}
-
-export interface ScaffoldTemplate {
-  id: string;
-  name: string;
-  description: string;
-  tech: string;
-  difficulty: string;
-}
-
-export interface MarketSkill {
-  name: string;
-  description: string;
-  category: string;
-  author: string;
-  installs: string;
-}
-
-export interface LearningEntry {
-  id: string;
-  skillName: string;
-  pattern: string;
-  context: string;
-  sourceRunId: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-}
-
-export interface BenchmarkRun {
-  id: string;
-  suite: string;
-  date: string;
-  fakeMode: boolean;
-  results: Array<{
-    model: string;
-    quality: number;
-    latencyMs: number;
-    tokens: number;
-    criteria: Record<string, number>;
-  }>;
-}
-
-export interface ScreenshotAsset {
-  filename: string;
-  capturedAt: string;
-  hasErrors: boolean;
-  url: string;
-}
-
-export interface Settings {
-  geminiApiKeyStatus: 'valid' | 'invalid' | 'missing';
-  maskedKey: string;
-  defaultModel: string;
-  proModel: string;
-  maxTokens: number;
-  requestTimeoutMs: number;
-  safetyMode: string;
-}
-
-export interface DeployRun {
-  id: string;
-  timestamp: string;
-  environment: string;
-  verdict: 'PASS' | 'FAIL';
-  durationMs: number;
-  gitHash: string;
-  healthCheckVerdict: 'PASS' | 'FAIL' | null;
-}
-
-export interface HistoryEntry {
-  id: string;
-  command: string;
-  skillName: string;
-  inputs: Record<string, string>;
-  flags: Record<string, boolean | string>;
-  verdict: 'PASS' | 'REVISE' | 'FAIL' | null;
-  startedAt: string;
-  completedAt: string | null;
-  durationMs: number | null;
-  provider: string;
-  model: string;
-}
-
-export interface WorkflowSuggestion {
-  skill: string;
-  priority: number;
-  reason: string;
-  risk: string;
-  category: 'critical' | 'recommended' | 'optional';
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  skillName: string;
-  inputs: Record<string, string>;
-  flags: Record<string, boolean | string>;
-  createdAt: string;
-}
-
-// ── SSE Event types ──────────────────────────────────────────────────────────
-
-export type ShellEvent =
-  | { type: 'reasoning'; text: string }
-  | { type: 'tool-call'; toolName: string; args: Record<string, unknown>; gateDecision: 'ALLOW' | 'REQUIRE_APPROVAL' | 'DENY' }
-  | { type: 'tool-result'; toolName: string; output: string; durationMs: number; error?: string }
-  | { type: 'approval-required'; runId: string; toolName: string; description: string; permissionLevel: 'READ' | 'WRITE' | 'EXECUTE' | 'DESTRUCTIVE'; args: Record<string, unknown> }
-  | { type: 'artifact-saved'; skillName: string; verdict: string; path: string; timestamp: string }
-  | { type: 'complete'; skillName: string; verdict: string; durationMs: number }
-  | { type: 'error'; message: string; code?: string };
+export type * from './api-types';
 
 // ── API functions ─────────────────────────────────────────────────────────────
 
@@ -273,14 +78,14 @@ export const api = {
   getSkills: () => apiFetch<SkillSummary[]>('/skills'),
   getMarketSkills: () => apiFetch<MarketSkill[]>('/skills/market'),
   getSkill: (name: string) => apiFetch<SkillDetail>(`/skills/${name}`),
-  runSkill: (name: string, inputs: Record<string, string> = {}, flags?: { dryRun?: boolean; force?: boolean; provider?: string }) =>
+  runSkill: (name: string, inputs: Record<string, string> = {}, flags?: { dryRun?: boolean; force?: boolean; provider?: 'gemini' | 'fake' }) =>
     apiFetch<{ runId: string }>(`/skills/${name}/run`, {
       method: 'POST',
       body: JSON.stringify({ inputs, ...flags }),
     }),
 
   // Runs
-  getRuns: (limit?: number) => apiFetch<RunRecord[]>(`/runs${limit ? `?limit=${limit}` : ''}`),
+  getRuns: (limit?: number) => apiFetch<RunSummary[]>(`/runs${limit ? `?limit=${limit}` : ''}`),
   getRun: (runId: string) => apiFetch<RunRecord>(`/runs/${runId}`),
   stopRun: (runId: string) => apiFetch<{ stopped: boolean }>(`/runs/${runId}/stop`, { method: 'POST' }),
   streamRun: (runId: string, onEvent: (event: ShellEvent) => void, onComplete: () => void) => {
@@ -308,7 +113,7 @@ export const api = {
   getArtifactVersions: (skillName: string) => apiFetch<ArtifactVersion[]>(`/artifacts/${skillName}`),
   getLatestArtifact: (skillName: string) => apiFetch<Artifact>(`/artifacts/${skillName}/latest`),
   getArtifactDiff: (skillName: string, v1: string, v2: string) =>
-    apiFetch<ArtifactDiff>(`/artifacts/${skillName}/diff?v1=${v1}&v2=${v2}`),
+    apiFetch<ArtifactDiff>(`/artifacts/${encodeURIComponent(skillName)}/diff?v1=${encodeURIComponent(v1)}&v2=${encodeURIComponent(v2)}`),
 
   // Workflow
   getWorkflowGraph: () => apiFetch<WorkflowGraph>('/workflow/graph'),
@@ -430,7 +235,6 @@ export const apiClient = {
   streamRun: api.streamRun,
   respondToApproval: (runId: string, decision: 'approve' | 'deny') =>
     api.respondToApproval(runId, decision),
-  updateProjectSettings: () => Promise.resolve({ success: true }),
 };
 
 export type RunEventType = 'reasoning' | 'tool-call' | 'tool-result' | 'approval-required' | 'artifact-saved' | 'complete' | 'error';

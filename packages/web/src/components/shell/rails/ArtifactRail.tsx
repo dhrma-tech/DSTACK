@@ -6,6 +6,7 @@ import { api, type Artifact, type ArtifactVersion } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import type { BadgeVariant } from '@/components/ui/Badge';
 import { Download } from 'lucide-react';
+import Link from 'next/link';
 
 interface ArtifactRailProps {
   selectedSkill?: string | null;
@@ -107,6 +108,7 @@ export default function ArtifactRail({ selectedSkill }: ArtifactRailProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: 'var(--coral)' }}>/{selectedSkill}</span>
             {verdict && <Badge variant={verdict}>{verdict}</Badge>}
+            <Link href={`/artifacts/${encodeURIComponent(selectedSkill)}`} style={{ fontSize: 11, color: 'var(--coral)' }}>Open full view →</Link>
           </div>
 
           {/* Version pills */}

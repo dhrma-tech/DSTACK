@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Lock } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
-import type { Skill } from '@/lib/mock-data';
+import type { SkillSummary as Skill } from '@/lib/api';
 
 interface CommandPaletteProps {
   isOpen: boolean;

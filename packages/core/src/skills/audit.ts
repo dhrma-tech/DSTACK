@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type JsonObject, type SkillManifest, ValidationError } from "@dstack/shared";
+import { PARTIAL_SKILLS, type JsonObject, type SkillManifest, ValidationError } from "@dstack/shared";
 import { defaultOutputs } from "../default-outputs.js";
 import { SkillRegistry, validateJsonSchema } from "../skills.js";
 import { ToolRegistry } from "../tools.js";
@@ -73,14 +73,7 @@ const highRiskSkills = new Set([
   "dstack-upgrade"
 ]);
 
-// Skills known to be partial/experimental
-const partialSkills = new Set([
-  "pair-agent",
-  "benchmark-models",
-  "codex",
-  "cso",
-  "skillify"
-]);
+const partialSkills = new Set(PARTIAL_SKILLS);
 
 export class SkillAuditor {
   private readonly registry: SkillRegistry;

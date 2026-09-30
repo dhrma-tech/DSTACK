@@ -1,4 +1,4 @@
-import { CORE_PIPELINE, type SkillManifest, type SkillPipeline, type SkillPipelineNode, type SkillSuggestion, type Verdict } from "@dstack/shared";
+import { CORE_PIPELINE, PROJECT_STAGES, SKILL_STAGE, type ProjectHealth, type ProjectHealthStatus, type ProjectStage, type SkillManifest, type SkillPipeline, type SkillPipelineNode, type SkillSuggestion, type Verdict } from "@dstack/shared";
 
 export interface PipelineSources {
   manifests: SkillManifest[];
@@ -85,4 +85,29 @@ export function suggestNextSkills(pipeline: SkillPipeline): SkillSuggestion[] {
   });
 
   return suggestions.slice(0, MAX_SUGGESTIONS).map((suggestion, index) => ({ ...suggestion, priority: index + 1 }));
+}
+
+const HEALTH_PENALTY = { FAIL: 25, stale: 10, REVISE: 5 } as const;
+
+/** The furthest stage with a finished, non-failing result. A new project is in planning. */
+export function projectStage(pipeline: SkillPipeline): ProjectStage {
+  let furthest = 0;
+  for (const node of pipeline.nodes) {
+    const stage = SKILL_STAGE[node.skillName];
+    if (!stage || !(node.status === "PASS" || node.status === "complete")) continue;
+    furthest = Math.max(furthest, PROJECT_STAGES.indexOf(stage));
+  }
+  return PROJECT_STAGES[furthest] ?? "planning";
+}
+
+/** A simple, explainable health score derived from the pipeline. */
+export function projectHealth(pipeline: SkillPipeline): ProjectHealth {
+  const names = (status: SkillPipelineNode["status"]) => pipeline.nodes.filter((node) => node.status === status).map((node) => node.skillName);
+  const failing = names("FAIL");
+  const stale = names("stale");
+  const revise = names("REVISE");
+  const score = Math.max(0, 100 - failing.length * HEALTH_PENALTY.FAIL - stale.length * HEALTH_PENALTY.stale - revise.length * HEALTH_PENALTY.REVISE);
+  const status: ProjectHealthStatus = score >= 80 ? "HEALTHY" : score >= 50 ? "DEGRADED" : "CRITICAL";
+  const recommendations = suggestNextSkills(pipeline).slice(0, 3).map((suggestion) => suggestion.reason);
+  return { score, status, failing, stale, revise, recommendations };
 }

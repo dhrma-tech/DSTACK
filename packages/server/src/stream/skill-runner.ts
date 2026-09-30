@@ -21,6 +21,8 @@ export interface RunRequest {
 }
 
 const STOP_GRACE_MS = 5_000;
+// eslint-disable-next-line no-control-regex -- matching terminal escape sequences is the point
+const ANSI_ESCAPE = /\u001b\[[0-9;]*[A-Za-z]/g;
 const SAVE_DEBOUNCE_MS = 500;
 
 // Resolved once: running the CLI via `node <tsx cli>` avoids a shell entirely,
@@ -51,7 +53,7 @@ export class SkillRunner {
     this.records.set(runId, {
       id: runId, skillName, status: 'running', startedAt: new Date().toISOString(), completedAt: null,
       verdict: null, durationMs: null, provider: request.flags.provider ?? process.env.DSTACK_PROVIDER ?? 'gemini',
-      toolCallCount: 0, events: []
+      toolCallCount: 0, inputs: { ...request.inputs }, flags: { ...request.flags }, events: []
     });
 
     this.emitEvent(runId, { type: 'reasoning', text: `Starting skill: ${skillName}` });
@@ -144,7 +146,8 @@ export class SkillRunner {
     try {
       event = JSON.parse(line) as RunEvent;
     } catch {
-      this.emitEvent(runId, { type: 'reasoning', text: line });
+      // Plain CLI output; drop terminal colour codes so the text reads cleanly in the browser.
+      this.emitEvent(runId, { type: 'reasoning', text: line.replace(ANSI_ESCAPE, '') });
       return;
     }
     // The CLI prints its own `complete` before it exits. The runner sends the authoritative

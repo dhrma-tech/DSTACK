@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import notifier from 'node-notifier';
+import { loadProjectEnv } from '@dstack/core';
 import { createApp } from './app';
 import { getDstackDir, getProjectRoot, setProjectRoot } from './context';
 import { loadOrCreateToken } from './lib/auth';
@@ -42,6 +43,7 @@ function attachNotifications(): () => void {
 export async function startServer(options: StartServerOptions = {}): Promise<RunningServer> {
   if (options.projectRoot) setProjectRoot(options.projectRoot);
   const projectRoot = getProjectRoot();
+  loadProjectEnv(projectRoot);
   const host = options.host ?? '127.0.0.1';
   const tokenFileRelative = options.tokenFile ?? DEFAULT_TOKEN_FILE;
   const tokenPath = path.resolve(projectRoot, tokenFileRelative);

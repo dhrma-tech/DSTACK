@@ -100,22 +100,7 @@ export default function DstackPage() {
 
           {/* Docked command input */}
           <CommandInput
-            skills={Array.isArray(skills) ? skills.map(s => ({
-              name: s.name,
-              command: s.command,
-              description: s.description,
-              stage: s.stage,
-              model: s.model,
-              maturity: s.maturity as 'complete' | 'partial' | 'experimental',
-              available: s.available,
-              hasLatestArtifact: s.hasLatestArtifact,
-              lastRunAt: s.lastRunAt,
-              lastVerdict: null,
-              isBlocked: !s.available,
-              requiresArtifacts: s.requiresArtifacts,
-              allowedTools: s.allowedTools,
-              nextSkill: s.nextSkill,
-            })) : []}
+            skills={skills}
             suggestions={suggestions}
             isRunning={isRunning}
             currentSkill={currentSkill}

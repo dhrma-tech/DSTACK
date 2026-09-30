@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { api, type MarketSkill } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
-import { Download, Star, Users, Search, Filter, Globe, Shield } from 'lucide-react';
+import { Users, Search, Filter, Globe, Shield } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SkillMarketPage() {
   const [skills, setSkills] = useState<MarketSkill[]>([]);
@@ -54,6 +55,14 @@ export default function SkillMarketPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
               {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton skeleton-block" style={{ height: 200, borderRadius: 20 }} />)}
             </div>
+          ) : skills.length === 0 ? (
+            <div style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 16, padding: 40, textAlign: 'center' }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 400, color: 'var(--ink)', marginBottom: 8 }}>No community skills yet</h2>
+              <p style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 480, margin: '0 auto 16px' }}>
+                A skill marketplace isn&apos;t available yet. All 42 built-in skills are on the Skills page, and you can create your own with <code style={{ fontFamily: 'var(--font-mono)' }}>ds /skillify</code>.
+              </p>
+              <Link href="/skills" className="btn btn-secondary">Browse built-in skills</Link>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
               {filtered.map(skill => (
@@ -73,13 +82,7 @@ export default function SkillMarketPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
                         <Users size={12} /> {skill.installs}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
-                        <Star size={12} fill="var(--amber)" stroke="var(--amber)" /> 4.9
-                      </div>
                     </div>
-                    <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--ink)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                      <Download size={14} /> Install
-                    </button>
                   </div>
                 </div>
               ))}
