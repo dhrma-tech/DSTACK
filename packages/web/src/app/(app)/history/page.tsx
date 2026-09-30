@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import Badge from '@/components/ui/Badge';
@@ -11,41 +11,40 @@ import { Search, RotateCcw, Trash2, Clock, Filter } from 'lucide-react';
 export default function HistoryPage() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [verdictFilter, setVerdictFilter] = useState<string>('');
   const [daysFilter, setDaysFilter] = useState<number>(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [timelineIndex, setTimelineIndex] = useState(0);
 
-  const loadHistory = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.getHistory({
-        search: search || undefined,
-        verdict: verdictFilter || undefined,
-        days: daysFilter || undefined,
-        limit: 100,
-      });
-      setEntries(data.entries);
-      setTotal(data.total);
-    } catch {
-      // Use empty state on error
-      setEntries([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, verdictFilter, daysFilter]);
+  // Loading is derived: true until results for the current filters have arrived.
+  const filterKey = JSON.stringify([search, verdictFilter, daysFilter]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== filterKey;
 
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    let cancelled = false;
+    api.getHistory({
+      search: search || undefined,
+      verdict: verdictFilter || undefined,
+      days: daysFilter || undefined,
+      limit: 100,
+    })
+      .then((data) => data, () => ({ entries: [], total: 0 }))
+      .then((data) => {
+        if (cancelled) return;
+        setEntries(data.entries);
+        setTotal(data.total);
+        setLoadedKey(filterKey);
+      });
+    return () => { cancelled = true; };
+  }, [search, verdictFilter, daysFilter, filterKey]);
 
   const handleClear = async () => {
     if (!confirm('Clear all command history? This cannot be undone.')) return;
     await api.clearHistory().catch(() => null);
-    loadHistory();
+    setEntries([]);
+    setTotal(0);
   };
 
   const formatDuration = (ms: number | null) => {
@@ -120,7 +119,7 @@ export default function HistoryPage() {
           <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--canvas)', borderRadius: 10, display: 'flex', gap: 12, alignItems: 'center' }}>
             {entries[timelineIndex] && (
               <>
-                <Badge variant={entries[timelineIndex].verdict as any}>{entries[timelineIndex].verdict || 'PENDING'}</Badge>
+                <Badge variant={entries[timelineIndex].verdict ?? 'PENDING'}>{entries[timelineIndex].verdict || 'PENDING'}</Badge>
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Executed /{entries[timelineIndex].skillName}</span>
                 <span style={{ fontSize: 11, color: 'var(--muted)' }}>{new Date(entries[timelineIndex].startedAt).toLocaleString()}</span>
               </>

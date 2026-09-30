@@ -43,7 +43,7 @@ export default function PlaygroundPage() {
       }, () => {
         setAgents(prev => prev.map(a => a.id === id ? { ...a, status: 'complete' } : a));
       });
-    } catch (_err) {
+    } catch {
       setAgents(prev => prev.map(a => a.id === id ? { ...a, status: 'error' } : a));
     }
   };
@@ -92,7 +92,7 @@ export default function PlaygroundPage() {
               </div>
 
               <div style={{ flex: 1, background: '#0a0a0a', padding: 16, fontFamily: 'var(--font-mono)', fontSize: 12, overflowY: 'auto', color: '#e0e0e0', minHeight: 300 }}>
-                {agent.events.length === 0 && <div style={{ color: '#666' }}>// Agent idle. Enter skill name and click RUN.</div>}
+                {agent.events.length === 0 && <div style={{ color: '#666' }}>{'// Agent idle. Enter a skill name and click Run.'}</div>}
                 {agent.events.map((ev, i) => (
                   <div key={i} style={{ marginBottom: 4, lineHeight: 1.5 }}>
                     {ev.type === 'reasoning' && <span style={{ color: '#888' }}>{ev.text}</span>}

@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { GitCompare, Plus, Minus } from 'lucide-react';
+import type { ArtifactDiff as ArtifactDiffData } from '@/lib/api';
 
 interface ArtifactDiffProps {
-  v1: any;
-  v2: any;
+  v1: ArtifactDiffData['v1'];
+  v2: ArtifactDiffData['v2'];
   semanticSummary?: string;
 }
 

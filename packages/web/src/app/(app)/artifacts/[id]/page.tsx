@@ -16,22 +16,22 @@ export default function ArtifactDetailPage() {
   const artifactId = params.id as string;
   const { artifacts } = useApp();
   const [compareVersion, setCompareVersion] = React.useState<string | null>(null);
-  const [diffData, setDiffData] = React.useState<ArtifactDiffType | null>(null);
-  const [diffLoading, setDiffLoading] = React.useState(false);
+  // The diff we last fetched, tagged with the version it was for. Loading and the visible
+  // diff are derived from it, so switching versions never shows a stale diff.
+  const [fetchedDiff, setFetchedDiff] = React.useState<{ version: string; data: ArtifactDiffType | null } | null>(null);
 
   const artifact = artifacts.find(a => a.id === artifactId);
+  const diffData = compareVersion && fetchedDiff?.version === compareVersion ? fetchedDiff.data : null;
+  const diffLoading = compareVersion !== null && fetchedDiff?.version !== compareVersion;
 
   React.useEffect(() => {
-    if (compareVersion && artifact) {
-      setDiffLoading(true);
-      // v1 is old (compareVersion), v2 is new (current artifact)
-      api.getArtifactDiff(artifact.skillName, compareVersion, artifact.version)
-        .then(setDiffData)
-        .catch(() => setDiffData(null))
-        .finally(() => setDiffLoading(false));
-    } else {
-      setDiffData(null);
-    }
+    if (!compareVersion || !artifact) return;
+    let cancelled = false;
+    // v1 is old (compareVersion), v2 is new (current artifact)
+    api.getArtifactDiff(artifact.skillName, compareVersion, artifact.version)
+      .then((data) => data, () => null)
+      .then((data) => { if (!cancelled) setFetchedDiff({ version: compareVersion, data }); });
+    return () => { cancelled = true; };
   }, [compareVersion, artifact]);
 
   if (!artifact) {

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getDstackDir } from '../context';
@@ -27,8 +28,9 @@ function runsDir(): string {
 export async function saveRunRecord(record: RunRecord): Promise<void> {
   await mkdir(runsDir(), { recursive: true });
   const target = path.join(runsDir(), `${record.id}.json`);
-  const temp = `${target}.tmp`;
-  await writeFile(temp, JSON.stringify(record, null, 2), 'utf-8');
+  const content = JSON.stringify(record, null, 2);
+  const temp = `${target}.${process.pid}-${randomBytes(4).toString('hex')}.tmp`;
+  await writeFile(temp, content, 'utf-8');
   await rename(temp, target);
 }
 

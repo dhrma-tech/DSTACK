@@ -15,7 +15,7 @@ import SuggestionBanner from '@/components/SuggestionBanner';
 
 export default function DstackPage() {
   const { skills, project } = useApp();
-  const { events, isRunning, currentSkill, startRun, stopRun, respondToApproval, verdict } = useActiveRun();
+  const { events, isRunning, currentSkill, startRun, stopRun, respondToApproval } = useActiveRun();
   const { suggestions, loading: suggestionsLoading } = useSuggestions(events.length);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null);

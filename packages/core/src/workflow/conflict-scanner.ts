@@ -1,68 +1,43 @@
-import { ArtifactStore } from '../artifacts/store.js';
+import type { ArtifactConflict, ConflictSeverity, Verdict } from "@dstack/shared";
 
-export interface ConflictRecord {
-  artifactA: string;
-  artifactB: string;
-  field: string;
-  conflict: string;
-  severity: 'high' | 'medium' | 'low';
+/** Minimal read access the scanner needs; satisfied by ArtifactStore. */
+export interface LatestVerdictReader {
+  readLatest(skillName: string): Promise<{ verdict: Verdict | null; createdAt: string } | null>;
 }
 
+interface VerdictRule {
+  /** The skill whose PASS is contradicted. */
+  passed: string;
+  /** A skill that, when not PASS, contradicts it. */
+  objecting: string;
+  field: string;
+  severity: ConflictSeverity;
+  message: (objectingVerdict: Verdict) => string;
+}
+
+// Contradictions between real DStack artifacts, read from their verdicts.
+const RULES: VerdictRule[] = [
+  { passed: "qa", objecting: "review", field: "overallVerdict", severity: "high", message: (v) => `QA passed, but code review is ${v}. QA may have validated code the review rejected.` },
+  { passed: "ship", objecting: "qa", field: "overallVerdict", severity: "high", message: (v) => `Ship passed, but the latest QA is ${v}.` },
+  { passed: "plan-eng-review", objecting: "plan-ceo-review", field: "overallVerdict", severity: "medium", message: (v) => `Engineering approved the plan, but the CEO review is ${v}.` },
+  { passed: "plan-ceo-review", objecting: "plan-eng-review", field: "overallVerdict", severity: "medium", message: (v) => `The CEO review approved the plan, but the engineering review is ${v}.` },
+  { passed: "review", objecting: "design-review", field: "overallVerdict", severity: "medium", message: (v) => `Code review passed, but the design review is ${v}.` },
+  { passed: "qa", objecting: "health", field: "overallVerdict", severity: "low", message: (v) => `QA passed, but the project health check is ${v}.` }
+];
+
 export class ConflictScanner {
-  constructor(private artifactStore: ArtifactStore) {}
+  constructor(private readonly artifacts: LatestVerdictReader) {}
 
-  async scan(graph: any): Promise<ConflictRecord[]> {
-    const conflicts: ConflictRecord[] = [];
-    const artifacts = new Map<string, any>();
-
-    // Load all current artifacts
-    for (const node of graph.nodes) {
-      if (node.status === 'PASS' || node.status === 'REVISE') {
-        const artifactsList = await this.artifactStore.listArtifactsBySkill(node.skillName, 1);
-        const latest = artifactsList[0];
-        if (latest) {
-          artifacts.set(node.skillName, latest.content);
-        }
-      }
+  async scan(): Promise<ArtifactConflict[]> {
+    const skills = [...new Set(RULES.flatMap((rule) => [rule.passed, rule.objecting]))];
+    const latest = new Map(await Promise.all(skills.map(async (skill) => [skill, await this.artifacts.readLatest(skill)] as const)));
+    const conflicts: ArtifactConflict[] = [];
+    for (const rule of RULES) {
+      const passed = latest.get(rule.passed);
+      const objecting = latest.get(rule.objecting);
+      if (passed?.verdict !== "PASS" || !objecting?.verdict || objecting.verdict === "PASS") continue;
+      conflicts.push({ artifactA: rule.passed, artifactB: rule.objecting, field: rule.field, conflict: rule.message(objecting.verdict), severity: rule.severity });
     }
-
-    // Rule 1: Product plan vs Architecture
-    const plan = artifacts.get('product-manager');
-    const arch = artifacts.get('system-architect');
-    
-    if (plan?.features && arch?.services) {
-      // Mock logic: if plan has >5 features but arch has 1 service, flag it
-      if (plan.features.length > 5 && arch.services.length === 1) {
-        conflicts.push({
-          artifactA: 'product-manager',
-          artifactB: 'system-architect',
-          field: 'scope',
-          conflict: 'Plan outlines many features, but architecture defines only a single monolithic service.',
-          severity: 'medium'
-        });
-      }
-    }
-
-    // Rule 2: Frontend Developer vs UI Designer
-    const fe = artifacts.get('frontend-developer');
-    const ui = artifacts.get('ui-designer');
-
-    if (fe?.components && ui?.components) {
-      const feNames = new Set((fe.components as Array<{name: string}>).map(c => c.name));
-      const uiNames = (ui.components as Array<{name: string}>).map(c => c.name);
-      
-      const missing = uiNames.filter(name => !feNames.has(name));
-      if (missing.length > 0) {
-        conflicts.push({
-          artifactA: 'ui-designer',
-          artifactB: 'frontend-developer',
-          field: 'components',
-          conflict: `Frontend is missing components designed by UI: ${missing.join(', ')}`,
-          severity: 'high'
-        });
-      }
-    }
-
     return conflicts;
   }
 }

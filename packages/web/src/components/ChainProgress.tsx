@@ -41,7 +41,6 @@ export default function ChainProgress({ chainId, chain }: ChainProgressProps) {
           const isComplete = i < currentIdx || (i === currentIdx && status === 'complete');
           const isRunning = i === currentIdx && status === 'running';
           const isError = i === currentIdx && status === 'error';
-          const isPending = i > currentIdx;
 
           return (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 1 }}>

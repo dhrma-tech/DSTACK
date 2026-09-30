@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { GeminiAgentClient, type GeminiCacheResult } from "./gemini-agent.js";
+import type { GeminiAgentClient, GeminiCacheResult } from "./gemini-agent.js";
 
 export interface GBrainCacheMetadata {
   cacheName: string | null;

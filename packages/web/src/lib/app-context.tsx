@@ -92,7 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (artifactsRes && Array.isArray(artifactsRes)) {
-          setArtifacts((artifactsRes as Array<any>).map(a => ({
+          setArtifacts(artifactsRes.map(a => ({
             id: `${a.skillName}-${a.timestamp}`,
             skillName: a.skillName,
             artifactType: a.skillName,

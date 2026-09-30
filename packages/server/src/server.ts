@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import notifier from 'node-notifier';
@@ -50,7 +51,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Run
   const app = createApp({ token, ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {}), extraHosts: [host] });
   const detachNotifications = options.notifications === false ? () => undefined : attachNotifications();
 
-  const server = await new Promise<import('node:http').Server>((resolve, reject) => {
+  const server = await new Promise<Server>((resolve, reject) => {
     const listening = app.listen(options.port ?? 3001, host, () => resolve(listening));
     listening.on('error', reject);
   });

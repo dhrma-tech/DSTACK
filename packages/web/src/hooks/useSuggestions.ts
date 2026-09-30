@@ -7,8 +7,8 @@ export function useSuggestions(refreshKey?: number) {
   const [suggestions, setSuggestions] = useState<WorkflowSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // `loading` covers the first load only; background refreshes keep showing the current list.
   const refresh = useCallback(() => {
-    setLoading(true);
     api.getWorkflowSuggestions()
       .then(data => setSuggestions(data.suggestions))
       .catch(() => setSuggestions([]))

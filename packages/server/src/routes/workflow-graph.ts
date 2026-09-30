@@ -1,42 +1,37 @@
 import { Router } from 'express';
-import { WorkflowService } from '@dstack/core';
-import type { Contracts } from '@dstack/shared';
-import { serviceOptions } from '../context';
+import type { SkillPipelineNode } from '@dstack/shared';
 import { asyncRoute } from '../lib/http';
+import { currentPipeline } from '../lib/pipeline';
 
 export const workflowGraphRouter = Router();
 
-type UiStatus = 'not_started' | 'ready' | 'running' | 'PASS' | 'REVISE' | 'FAIL' | 'BLOCKED' | 'STALE';
+type UiStatus = 'not_started' | 'ready' | 'PASS' | 'REVISE' | 'FAIL' | 'BLOCKED' | 'STALE';
 
-function uiStatus(node: Contracts.WorkflowNode): UiStatus {
-  if (node.isStale || node.status === 'stale') return 'STALE';
-  if (node.status === 'blocked') return 'BLOCKED';
-  if (node.status === 'running') return 'running';
-  if (node.status === 'ready') return 'ready';
-  if (node.verdict) return node.verdict;
-  return 'not_started';
+function uiStatus(node: SkillPipelineNode): UiStatus {
+  switch (node.status) {
+    case 'stale': return 'STALE';
+    case 'blocked': return 'BLOCKED';
+    case 'ready': return 'ready';
+    case 'complete': return 'PASS';
+    default: return node.status;
+  }
 }
 
 workflowGraphRouter.get('/graph', asyncRoute(async (_req, res) => {
-  const graph = await new WorkflowService(serviceOptions()).getWorkflowStatus();
-  const skillNodes = graph.nodes.filter((node) => node.nodeType === 'skill');
-  const skillIds = new Set(skillNodes.map((node) => node.id));
+  const pipeline = await currentPipeline();
   res.json({
-    currentStage: graph.currentStage,
-    blockers: graph.blockers,
-    suggestedNextSkills: graph.suggestedNextSkills,
-    nodes: skillNodes.map((node) => ({
-      id: node.id,
-      skillName: node.skillName ?? node.id,
-      label: node.label,
-      phase: node.stage,
+    nodes: pipeline.nodes.map((node) => ({
+      id: node.skillName,
+      skillName: node.skillName,
+      label: node.skillName,
+      phase: node.requires.length === 0 ? 'start' : 'pipeline',
       status: uiStatus(node),
-      verdict: node.verdict ?? null,
-      timestamp: null,
-      isStale: node.isStale
+      verdict: node.verdict,
+      timestamp: node.artifactAt,
+      isStale: node.status === 'stale',
+      missing: node.missing,
+      staleBecause: node.staleBecause
     })),
-    edges: graph.edges
-      .filter((edge) => skillIds.has(edge.fromNodeId) && skillIds.has(edge.toNodeId))
-      .map((edge) => ({ from: edge.fromNodeId, to: edge.toNodeId }))
+    edges: pipeline.edges
   });
 }));

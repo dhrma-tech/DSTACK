@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, GitBranch, Zap, History, Clock,
-  Box, Globe, Rocket, BarChart3,
+  Box, Globe, Rocket,
   Settings, ChevronLeft, ChevronRight, Terminal,
   Cpu, Shield
 } from 'lucide-react';

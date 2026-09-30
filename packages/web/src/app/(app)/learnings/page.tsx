@@ -12,7 +12,6 @@ export default function LearningsPage() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
-    setLoading(true);
     api.getLearnings().then(setLearnings).catch(() => null).finally(() => setLoading(false));
   }, []);
 

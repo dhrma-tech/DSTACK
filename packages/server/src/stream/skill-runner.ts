@@ -43,6 +43,7 @@ export class SkillRunner {
   private records = new Map<string, RunRecord>();
   private saveTimers = new Map<string, NodeJS.Timeout>();
   private stopped = new Set<string>();
+  private saving = new Map<string, Promise<void>>();
 
   startRun(runId: string, skillName: string, request: RunRequest = { inputs: {}, flags: {} }): EventEmitter {
     const emitter = new EventEmitter();
@@ -87,13 +88,16 @@ export class SkillRunner {
         record.completedAt = new Date().toISOString();
         record.durationMs = durationMs;
       }
-      this.emitEvent(runId, { type: 'complete', status, skillName, verdict: record?.verdict ?? null, durationMs });
-      void this.flush(runId);
+      // Persist the finished record before announcing completion, so anyone who
+      // reacts to `complete` by reading the run sees its final state.
+      const complete = this.record(runId, { type: 'complete', status, skillName, verdict: record?.verdict ?? null, durationMs });
       this.stopped.delete(runId);
+      void this.flush(runId).finally(() => this.broadcast(runId, complete));
       setTimeout(() => {
         this.activeRuns.delete(runId);
         this.childProcesses.delete(runId);
         this.records.delete(runId);
+        this.saving.delete(runId);
       }, 60_000).unref();
     });
 
@@ -136,15 +140,25 @@ export class SkillRunner {
 
   private handleLine(runId: string, line: string): void {
     if (!line.trim()) return;
+    let event: RunEvent;
     try {
-      this.emitEvent(runId, JSON.parse(line) as RunEvent);
+      event = JSON.parse(line) as RunEvent;
     } catch {
       this.emitEvent(runId, { type: 'reasoning', text: line });
+      return;
     }
+    // The CLI prints its own `complete` before it exits. The runner sends the authoritative
+    // one after the process has exited and the record is saved, so the CLI's copy is dropped.
+    if (event.type === 'complete') return;
+    this.emitEvent(runId, event);
   }
 
   private emitEvent(runId: string, rawEvent: RunEvent): void {
-    // Events reach the browser and are persisted, so absolute project paths are made relative first.
+    this.broadcast(runId, this.record(runId, rawEvent));
+  }
+
+  /** Adds an event to the run record. Events reach the browser and disk, so project paths are made relative first. */
+  private record(runId: string, rawEvent: RunEvent): RunEvent {
     const event = toProjectRelative(rawEvent);
     const record = this.records.get(runId);
     if (record) {
@@ -153,6 +167,10 @@ export class SkillRunner {
       if (event.type === 'artifact-saved' && (event.verdict === 'PASS' || event.verdict === 'REVISE' || event.verdict === 'FAIL')) record.verdict = event.verdict;
       this.scheduleSave(runId);
     }
+    return event;
+  }
+
+  private broadcast(runId: string, event: RunEvent): void {
     this.activeRuns.get(runId)?.emit('event', event);
     this.globalEmitter.emit('global_event', { runId, event });
   }
@@ -162,18 +180,25 @@ export class SkillRunner {
     this.saveTimers.set(runId, setTimeout(() => void this.flush(runId), SAVE_DEBOUNCE_MS));
   }
 
-  private async flush(runId: string): Promise<void> {
+  /** Saves the run record now. Saves for one run are chained so an older snapshot never lands after a newer one. */
+  private flush(runId: string): Promise<void> {
     const timer = this.saveTimers.get(runId);
     if (timer) clearTimeout(timer);
     this.saveTimers.delete(runId);
-    const record = this.records.get(runId);
-    if (!record) return;
-    try {
-      await saveRunRecord(record);
-    } catch (error) {
-      console.error(`Failed to save run record ${runId}:`, error);
-    }
+    const previous = this.saving.get(runId) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      const record = this.records.get(runId);
+      if (!record) return;
+      try {
+        await saveRunRecord(record);
+      } catch (error) {
+        console.error(`Failed to save run record ${runId}:`, error);
+      }
+    });
+    this.saving.set(runId, next);
+    return next;
   }
+
 }
 
 export const globalSkillRunner = new SkillRunner();

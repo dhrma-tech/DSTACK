@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bookmark, Trash2, Check, Download, Upload } from 'lucide-react';
+import { Bookmark, Trash2, Download } from 'lucide-react';
 import { api, type Template } from '@/lib/api';
 
 interface TemplateManagerProps {

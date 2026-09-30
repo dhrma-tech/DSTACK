@@ -1,77 +1,26 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { ConflictScanner } from '@dstack/core';
-// ConflictScanner requires the advanced ArtifactStore from core/artifacts/store
-import { ArtifactStore } from '../../../../packages/core/src/artifacts/store.js';
-import path from 'path';
-import { getDstackDir, getProjectRoot } from '../context';
-
+import { ArtifactStore, ConflictScanner, suggestNextSkills } from '@dstack/core';
+import { getDstackDir } from '../context';
+import { currentPipeline } from '../lib/pipeline';
 
 const router = Router();
 
-const getDStackDir = getDstackDir;
-
-interface Suggestion {
-  skill: string;
-  priority: number;
-  reason: string;
-  risk: string;
-  category: 'critical' | 'recommended' | 'optional';
-}
-
-// GET /api/workflow/suggestions — smart workflow suggestions
-router.get('/suggestions', (_req: Request, res: Response) => {
-  // In real implementation this calls core/workflow/suggestion-engine.ts
-  // For now we compute basic suggestions from available data
-  const suggestions: Suggestion[] = [
-    {
-      skill: 'design-consultation',
-      priority: 1,
-      reason: 'Your autoplan artifact is complete but design has not started. Run design-consultation to generate UI specs.',
-      risk: 'Skipping this will leave your implementation without design guidance — expect rework.',
-      category: 'recommended',
-    },
-    {
-      skill: 'review',
-      priority: 2,
-      reason: 'Multiple planning artifacts exist but have not been reviewed. Run review to validate readiness.',
-      risk: 'Shipping without review increases risk of missed requirements.',
-      category: 'recommended',
-    },
-    {
-      skill: 'qa',
-      priority: 3,
-      reason: 'Once review passes, run QA to validate implementation quality.',
-      risk: 'Low — this is an optional next step.',
-      category: 'optional',
-    },
-  ];
-
-  res.json({ suggestions, computedAt: new Date().toISOString() });
+// GET /api/workflow/suggestions — ranked next steps from the current pipeline state
+router.get('/suggestions', async (_req: Request, res: Response) => {
+  try {
+    const suggestions = suggestNextSkills(await currentPipeline());
+    res.json({ suggestions, computedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Failed to compute suggestions:', err);
+    res.status(500).json({ error: 'Failed to compute suggestions' });
+  }
 });
 
-// GET /api/workflow/conflicts — cross-skill conflict detection
+// GET /api/workflow/conflicts — contradictions between the latest artifacts' verdicts
 router.get('/conflicts', async (_req: Request, res: Response) => {
   try {
-    const store = new ArtifactStore({ 
-      dstackDir: getDStackDir(),
-      projectRoot: getProjectRoot() 
-    });
-    const scanner = new ConflictScanner(store);
-    
-    // In real impl, we fetch the real graph, but for demo we pass a mock one 
-    // since we don't have direct access to graph store here yet
-    const mockGraph = {
-      nodes: [
-        { id: '1', skillName: 'product-manager', status: 'PASS' },
-        { id: '2', skillName: 'system-architect', status: 'PASS' },
-        { id: '3', skillName: 'ui-designer', status: 'PASS' },
-        { id: '4', skillName: 'frontend-developer', status: 'PASS' }
-      ],
-      edges: []
-    } as any;
-    
-    const conflicts = await scanner.scan(mockGraph);
+    const conflicts = await new ConflictScanner(new ArtifactStore(getDstackDir())).scan();
     res.json({ conflicts, computedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Failed to scan conflicts:', err);

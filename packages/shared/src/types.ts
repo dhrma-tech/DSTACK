@@ -388,3 +388,43 @@ export interface UpgradePlan {
   upgradeExecuted: boolean;
   postUpgradeVerification: UpgradeVerification;
 }
+
+export type ConflictSeverity = "high" | "medium" | "low";
+
+/** Two artifacts whose conclusions contradict each other. */
+export interface ArtifactConflict {
+  artifactA: string;
+  artifactB: string;
+  field: string;
+  conflict: string;
+  severity: ConflictSeverity;
+}
+
+/** Status of one skill in the idea → ship pipeline, derived from its latest artifact. */
+export type SkillPipelineStatus = "ready" | "blocked" | "PASS" | "REVISE" | "FAIL" | "complete" | "stale";
+
+export interface SkillPipelineNode {
+  skillName: string;
+  requires: string[];
+  status: SkillPipelineStatus;
+  verdict: Verdict | null;
+  artifactAt: string | null;
+  /** Required artifacts that don't exist yet. */
+  missing: string[];
+  /** Upstream skills whose newer output makes this artifact stale. */
+  staleBecause: string[];
+  nextSkill: string | null;
+}
+
+export interface SkillPipeline {
+  nodes: SkillPipelineNode[];
+  edges: Array<{ from: string; to: string }>;
+}
+
+export interface SkillSuggestion {
+  skill: string;
+  priority: number;
+  reason: string;
+  risk: string;
+  category: "critical" | "recommended" | "optional";
+}

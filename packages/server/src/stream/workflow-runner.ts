@@ -7,7 +7,7 @@ import {
   SlopScannerError,
   type SandboxProvider
 } from "@dstack/core";
-import type { AgentEvent, AgentPersona, ApprovalGate, CodePatch, JsonObject, WorkflowTransition } from "@dstack/shared";
+import type { AgentEvent, AgentPersona, ApprovalGate, CodePatch, WorkflowTransition } from "@dstack/shared";
 import { getProjectRoot } from '../context';
 
 interface WorkflowRunState {

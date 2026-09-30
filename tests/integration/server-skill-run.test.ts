@@ -29,10 +29,11 @@ describe("skill runs through the server (fake provider)", () => {
     const { ticket } = (await (await ts.api("/api/stream-tickets", json({ path: `/api/runs/${runId}/stream` }))).json()) as { ticket: string };
     const events = await readStream(`${ts.url}/api/runs/${runId}/stream?ticket=${ticket}`);
     const complete = events.at(-1);
-    expect(complete).toMatchObject({ type: "complete", skillName: "office-hours", status: "complete" });
+    expect(complete).toMatchObject({ type: "complete", skillName: "office-hours", status: "complete", durationMs: expect.any(Number) });
+    // Exactly one `complete`: the runner's, sent after the process exits (the CLI's own copy is not forwarded).
+    expect(events.filter((event) => event.type === "complete")).toHaveLength(1);
 
-    // Allow the final debounced save to land.
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // No waiting: the server persists the final record before it broadcasts `complete`.
     const record = await (await ts.api(`/api/runs/${runId}`)).json();
     expect(record).toMatchObject({ id: runId, skillName: "office-hours", status: "complete", provider: "fake" });
     expect(record.events.length).toBeGreaterThan(1);

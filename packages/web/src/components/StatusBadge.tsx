@@ -1,6 +1,14 @@
 import React from 'react';
 
-type Status = 'success' | 'running' | 'error' | 'warning' | 'blocked' | 'idle' | 'stale' | 'complete' | 'not_run' | 'ready' | 'queued';
+export type Status = 'success' | 'running' | 'error' | 'warning' | 'blocked' | 'idle' | 'stale' | 'complete' | 'not_run' | 'ready' | 'queued';
+
+const STATUSES: readonly Status[] = ['success', 'running', 'error', 'warning', 'blocked', 'idle', 'stale', 'complete', 'not_run', 'ready', 'queued'];
+
+/** Maps any run status string to a known badge status (interrupted runs show as warnings). */
+export function toStatus(value: string): Status {
+  if (value === 'interrupted') return 'warning';
+  return (STATUSES as readonly string[]).includes(value) ? (value as Status) : 'idle';
+}
 
 const STATUS_MAP: Record<string, { dot: string; badge: string; label: string }> = {
   success:  { dot: 'status-dot-success', badge: 'badge-success', label: 'Success' },

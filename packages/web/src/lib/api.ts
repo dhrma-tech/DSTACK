@@ -304,7 +304,7 @@ export const api = {
     }),
 
   // Artifacts
-  getArtifacts: () => apiFetch<Record<string, ArtifactMeta>>('/artifacts'),
+  getArtifacts: () => apiFetch<ArtifactMeta[]>('/artifacts'),
   getArtifactVersions: (skillName: string) => apiFetch<ArtifactVersion[]>(`/artifacts/${skillName}`),
   getLatestArtifact: (skillName: string) => apiFetch<Artifact>(`/artifacts/${skillName}/latest`),
   getArtifactDiff: (skillName: string, v1: string, v2: string) =>
@@ -423,7 +423,7 @@ export const api = {
 export const apiClient = {
   getProject: api.getProject,
   getSkills: api.getSkills,
-  getArtifacts: () => api.getArtifacts().then(r => Object.values(r)),
+  getArtifacts: api.getArtifacts,
   getRuns: api.getRuns,
   runSkill: (skillName: string, args: Record<string, string> = {}) =>
     api.runSkill(skillName, args),

@@ -1,9 +1,17 @@
 import React from 'react';
-import type { SkillSummary } from '@/lib/api';
 import { BookOpen, Box, AlertTriangle, Fingerprint, Zap } from 'lucide-react';
 
+/** The skill fields this panel shows; satisfied by both the API skill summary and the app's skill list. */
+interface SkillDoc {
+  name: string;
+  description: string;
+  model: string;
+  requiresArtifacts: string[];
+  allowedTools?: string[];
+}
+
 interface SkillDocPanelProps {
-  skill: any;
+  skill: SkillDoc;
 }
 
 export default function SkillDocPanel({ skill }: SkillDocPanelProps) {

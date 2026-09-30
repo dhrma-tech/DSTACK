@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import AppShell from '@/components/AppShell';
-import StatusBadge from '@/components/StatusBadge';
+import StatusBadge, { toStatus } from '@/components/StatusBadge';
 import CodeWindow from '@/components/CodeWindow';
 import { useApp } from '@/lib/app-context';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, Cpu, Database, Layers, Download, RotateCcw, Columns, X } from 'lucide-react';
+import { Clock, Cpu, Database, Download, RotateCcw, Columns, X } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 
 export default function RunDetailPage() {
@@ -88,8 +88,8 @@ export default function RunDetailPage() {
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'center' }}>
           <h1 style={{ fontSize: 28, fontFamily: 'var(--font-serif)' }}>Run {run.id}</h1>
-          <StatusBadge status={run.status as any} />
-          {run.verdict && <Badge variant={run.verdict as any}>{run.verdict}</Badge>}
+          <StatusBadge status={toStatus(run.status)} />
+          {run.verdict && <Badge variant={run.verdict}>{run.verdict}</Badge>}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: isComparing && compareWith ? '1fr 1fr' : '1fr 280px', gap: 24 }}>
